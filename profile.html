@@ -60,10 +60,10 @@ let connectionStatus = null; // null | 'pending_sent' | 'pending_received' | 'co
 let allProducts = [];
 
 onAuthStateChanged(auth, async viewer => {
-  viewerUser = viewer;
-  await renderNav(viewer);
-  initSearch('navSearchInput','navSearchResults');
-  await loadProfile();
+    viewerUser = viewer;
+    renderNav(viewer); // removed await — don't block profile load on nav
+    initSearch('navSearchInput','navSearchResults');
+    await loadProfile();
 });
 
 async function loadProfile() {
