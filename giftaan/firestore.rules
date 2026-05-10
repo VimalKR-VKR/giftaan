@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Users ──────────────────────────────────────────────
+    match /users/{uid} {
+      // Anyone can read (for public profiles/search)
+      allow read: if true;
+      // Only the owner can write their own profile
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // ── Connection Requests ────────────────────────────────
+    match /users/{uid}/connectionRequests/{fromUid} {
+      // Owner can read all their requests
+      allow read: if request.auth != null && request.auth.uid == uid;
+      // Anyone signed in can write to request connection (send request)
+      allow create: if request.auth != null && request.auth.uid == fromUid;
+      // Owner can update (accept/decline) or the sender can cancel
+      allow update, delete: if request.auth != null &&
+        (request.auth.uid == uid || request.auth.uid == fromUid);
+    }
+
+    // ── Wishlists ──────────────────────────────────────────
+    match /wishlists/{uid}/products/{productId} {
+      // Anyone can read (for public profiles)
+      allow read: if true;
+      // Only owner can write
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
