@@ -163,6 +163,7 @@
 
   function buildAvatarGrid() {
     const grid = document.getElementById('avatarGrid');
+    console.log('buildAvatarGrid called, AVATARS:', AVATARS, 'grid:', grid);
     grid.innerHTML = '';
     AVATARS.forEach(emoji => {
       const el = document.createElement('div');
