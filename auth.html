@@ -144,7 +144,7 @@
     if (!snap.empty) return toast('Username already taken','error');
     try {
       const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await saveUserDoc(cred.user.uid, name, username, email, selectedAvatar);
+      await saveUserDoc(cred.user.uid, name, username, cred.user.email, AVATARS[Math.floor(Math.random()*AVATARS.length)], cred.user.photoURL);
       window.location.href = 'dashboard.html';
     } catch(e) { toast(e.message,'error'); }
   });
@@ -184,21 +184,22 @@
     } catch(e) { toast(e.message,'error'); }
   });
 
-  async function saveUserDoc(uid, name, username, email, avatar) {
-    await setDoc(doc(db,'users',uid), {
-      displayName: name,
-      displayNameLower: name.toLowerCase(),
-      username: username.toLowerCase(),
-      email: email,
-      avatarEmoji: avatar,
-      about: '',
-      address: '',
-      isPrivate: false,
-      addressVisibility: 'connections', // 'all' | 'connections' | 'hidden'
-      connectionCount: 0,
-      createdAt: serverTimestamp()
-    });
-  }
+  async function saveUserDoc(uid, name, username, email, avatar, photoURL = null) {
+  await setDoc(doc(db,'users',uid), {
+    displayName: name,
+    displayNameLower: name.toLowerCase(),
+    username: username.toLowerCase(),
+    email: email,
+    avatarEmoji: avatar,
+    photoURL: photoURL,       // ← ADD THIS LINE
+    about: '',
+    address: '',
+    isPrivate: false,
+    addressVisibility: 'connections',
+    connectionCount: 0,
+    createdAt: serverTimestamp()
+  });
+}
 
   // Enter key support
   document.addEventListener('keydown', e => {
