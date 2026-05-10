@@ -1,33 +1,32 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Edit Profile – Giftaan</title>
-  <link rel="stylesheet" href="css/styles.css"/>
-  <style>
-    .edit-wrap{max-width:640px;margin:40px auto;padding:0 20px;}
-    .edit-section{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:24px;}
-    .edit-section-title{font-size:18px;font-weight:700;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border);}
-    .toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);}
-    .toggle-row:last-child{border-bottom:none;}
-    .toggle-label{font-size:14px;font-weight:500;}
-    .toggle-desc{font-size:12px;color:var(--text-muted);margin-top:2px;}
-    .toggle{position:relative;width:44px;height:24px;flex-shrink:0;}
-    .toggle input{opacity:0;width:0;height:0;}
-    .toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:24px;cursor:pointer;transition:.3s;}
-    .toggle-slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;}
-    .toggle input:checked + .toggle-slider{background:var(--saffron);}
-    .toggle input:checked + .toggle-slider::before{transform:translateX(20px);}
-    .word-count{font-size:11px;color:var(--text-muted);text-align:right;margin-top:4px;}
-    .avatar-grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;}
-    .avatar-option{width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:24px;border-radius:50%;border:2px solid var(--border);cursor:pointer;transition:all .2s;background:#fff;}
-    .avatar-option:hover{border-color:var(--saffron);transform:scale(1.1);}
-    .avatar-option.selected{border-color:var(--saffron);background:rgba(255,153,0,0.12);transform:scale(1.1);}
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Edit Profile – Giftaan</title>
+<link rel="stylesheet" href="css/styles.css"/>
+<style>
+.edit-wrap{max-width:640px;margin:40px auto;padding:0 20px;}
+.edit-section{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:24px;}
+.edit-section-title{font-size:18px;font-weight:700;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);}
+.toggle-row:last-child{border-bottom:none;}
+.toggle-label{font-size:14px;font-weight:500;}
+.toggle-desc{font-size:12px;color:var(--text-muted);margin-top:2px;}
+.toggle{position:relative;width:44px;height:24px;flex-shrink:0;}
+.toggle input{opacity:0;width:0;height:0;}
+.toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:24px;cursor:pointer;transition:.3s;}
+.toggle-slider::before{content:'';position:absolute;width:18px;height:18px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.3s;}
+.toggle input:checked + .toggle-slider{background:var(--saffron);}
+.toggle input:checked + .toggle-slider::before{transform:translateX(20px);}
+.word-count{font-size:11px;color:var(--text-muted);text-align:right;margin-top:4px;}
+.avatar-grid{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;}
+.avatar-option{width:44px;height:44px;display:flex;align-items:center;justify-content:center;font-size:24px;border-radius:50%;border:2px solid var(--border);cursor:pointer;transition:all .2s;background:#fff;}
+.avatar-option:hover{border-color:var(--saffron);transform:scale(1.1);}
+.avatar-option.selected{border-color:var(--saffron);background:rgba(255,153,0,0.12);transform:scale(1.1);}
+</style>
 </head>
 <body>
-
 <nav class="navbar">
   <div class="navbar-inner">
     <a href="dashboard.html" class="navbar-brand">Gift<span>aan</span></a>
@@ -59,6 +58,9 @@
       <label>Username <span style="color:var(--text-light);font-weight:400">(used in your profile link)</span></label>
       <input type="text" class="form-control" id="editUsername" placeholder="username" maxlength="30"/>
       <div id="usernameStatus" style="font-size:12px;margin-top:4px;"></div>
+      <div id="usernameSuggestion" style="display:none;margin-top:6px;font-size:12px;color:var(--text-muted);">
+        Try: <span id="suggestionChips" style="display:inline-flex;gap:6px;flex-wrap:wrap;"></span>
+      </div>
     </div>
     <div class="form-group">
       <label>About <span style="color:var(--text-light);font-weight:400">(max 100 words)</span></label>
@@ -121,10 +123,9 @@
     </p>
     <button class="btn" id="deleteAccountBtn" style="background:#c0392b;color:#fff;border:none;">&#128465;&#65039; Delete My Account</button>
   </div>
-
 </div>
 
-<!-- Delete Account Confirmation Modal -->
+<!-- Delete Account Modal -->
 <div id="deleteAccountModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1000;align-items:center;justify-content:center;">
   <div style="background:#fff;border-radius:16px;padding:32px;max-width:420px;width:90%;box-shadow:0 8px 40px rgba(0,0,0,0.18);">
     <div style="font-size:40px;text-align:center;margin-bottom:12px;">&#9888;&#65039;</div>
@@ -145,239 +146,286 @@
 <div id="toast-container"></div>
 
 <script type="module">
-  import { auth, db } from './js/firebase-config.js';
-  import { toast, getUser, renderNav, wordCount, AVATARS } from './js/utils.js';
-  import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-  import { doc, setDoc, updateDoc, getDocs, collection, query, where, limit, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { auth, db } from './js/firebase-config.js';
+import { toast, getUser, renderNav, wordCount, AVATARS } from './js/utils.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import {
+  doc, setDoc, updateDoc, getDocs, collection, query, where, limit, serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-  let currentUser = null;
-  let userDoc = null;
-  let selectedAvatar = AVATARS[0];
+let currentUser = null;
+let userDoc = null;
+let selectedAvatar = AVATARS[0];
 
-  // ── Build avatar grid immediately so emojis show on load ──
-  function buildAvatarGrid() {
-    const grid = document.getElementById('avatarGrid');
-    grid.innerHTML = '';
-    AVATARS.forEach(emoji => {
-      const el = document.createElement('div');
-      el.className = 'avatar-option' + (emoji === selectedAvatar ? ' selected' : '');
-      el.textContent = emoji;
-      el.addEventListener('click', () => {
-        selectedAvatar = emoji;
-        document.querySelectorAll('.avatar-option').forEach(a => a.classList.remove('selected'));
-        el.classList.add('selected');
-      });
-      grid.appendChild(el);
+// ── Build avatar grid immediately ─────────────────────────────
+function buildAvatarGrid() {
+  const grid = document.getElementById('avatarGrid');
+  grid.innerHTML = '';
+  AVATARS.forEach(emoji => {
+    const el = document.createElement('div');
+    el.className = 'avatar-option' + (emoji === selectedAvatar ? ' selected' : '');
+    el.textContent = emoji;
+    el.addEventListener('click', () => {
+      selectedAvatar = emoji;
+      document.querySelectorAll('.avatar-option').forEach(a => a.classList.remove('selected'));
+      el.classList.add('selected');
     });
-  }
-  buildAvatarGrid(); // Call immediately — no need to wait for auth
+    grid.appendChild(el);
+  });
+}
+buildAvatarGrid();
 
-  // ── Word count ──
-  function updateWordCount() {
-    const wc = wordCount(document.getElementById('editAbout').value);
-    document.getElementById('wordCount').textContent = wc;
-    document.getElementById('wordCount').style.color = wc > 100 ? 'var(--crimson)' : 'var(--text-muted)';
-  }
-  document.getElementById('editAbout').addEventListener('input', updateWordCount);
+// ── Word count ────────────────────────────────────────────────
+function updateWordCount() {
+  const wc = wordCount(document.getElementById('editAbout').value);
+  document.getElementById('wordCount').textContent = wc;
+  document.getElementById('wordCount').style.color = wc > 100 ? 'var(--crimson)' : 'var(--text-muted)';
+}
+document.getElementById('editAbout').addEventListener('input', updateWordCount);
 
-  // ── Address visibility — mutually exclusive ──
-  ['addrAll','addrConnections','addrHidden'].forEach(id => {
-    document.getElementById(id).addEventListener('change', () => {
-      ['addrAll','addrConnections','addrHidden'].forEach(other => {
-        if (other !== id) document.getElementById(other).checked = false;
-      });
+// ── Address visibility — mutually exclusive ───────────────────
+['addrAll','addrConnections','addrHidden'].forEach(id => {
+  document.getElementById(id).addEventListener('change', () => {
+    ['addrAll','addrConnections','addrHidden'].forEach(other => {
+      if (other !== id) document.getElementById(other).checked = false;
     });
   });
+});
 
-  // ── Auth guard + load user data ──
-  onAuthStateChanged(auth, async user => {
-    if (!user) { window.location.href = 'auth.html'; return; }
-    currentUser = user;
-    userDoc = await getUser(user.uid);
-    if (!userDoc) { toast('Could not load profile','error'); return; }
-    await renderNav(user);
-    populateForm();
+// ── Auth guard + load user data ───────────────────────────────
+onAuthStateChanged(auth, async user => {
+  if (!user) { window.location.href = 'auth.html'; return; }
+  currentUser = user;
+  // FIX: fetch fresh from Firestore every login so data is never stale
+  userDoc = await getUser(user.uid);
+  if (!userDoc) { toast('Could not load profile','error'); return; }
+  await renderNav(user);
+  populateForm();
+});
+
+// ── Populate form with saved Firestore data ───────────────────
+function populateForm() {
+  document.getElementById('editName').value    = userDoc.displayName || '';
+  document.getElementById('editUsername').value = userDoc.username || '';
+  document.getElementById('editAbout').value   = userDoc.about || '';
+  document.getElementById('editAddress').value = userDoc.address || '';
+  document.getElementById('togglePrivate').checked = !!userDoc.isPrivate;
+
+  const av = userDoc.addressVisibility || 'connections';
+  document.getElementById('addrAll').checked         = av === 'all';
+  document.getElementById('addrConnections').checked = av === 'connections';
+  document.getElementById('addrHidden').checked      = av === 'hidden';
+
+  selectedAvatar = userDoc.avatarEmoji || AVATARS[0];
+  document.querySelectorAll('.avatar-option').forEach(el => {
+    el.classList.toggle('selected', el.textContent === selectedAvatar);
   });
+  updateWordCount();
+}
 
-  // ── Populate form with saved data ──
-  function populateForm() {
-    document.getElementById('editName').value = userDoc.displayName || '';
-    document.getElementById('editUsername').value = userDoc.username || '';
-    document.getElementById('editAbout').value = userDoc.about || '';
-    document.getElementById('editAddress').value = userDoc.address || '';
-    document.getElementById('togglePrivate').checked = !!userDoc.isPrivate;
-    const av = userDoc.addressVisibility || 'connections';
-    document.getElementById('addrAll').checked = av === 'all';
-    document.getElementById('addrConnections').checked = av === 'connections';
-    document.getElementById('addrHidden').checked = av === 'hidden';
-    // Update selected avatar to match saved one
-    selectedAvatar = userDoc.avatarEmoji || AVATARS[0];
-    document.querySelectorAll('.avatar-option').forEach(el => {
-      el.classList.toggle('selected', el.textContent === selectedAvatar);
-    });
-    updateWordCount();
+// ── Username availability check + suggestions ─────────────────
+let usernameTimeout;
+
+async function isUsernameTaken(username) {
+  const q = query(collection(db,'users'), where('username','==',username), limit(1));
+  const snap = await getDocs(q);
+  return !snap.empty;
+}
+
+async function generateSuggestions(base) {
+  const suggestions = [];
+  const candidates = [
+    base + '_' + Math.floor(Math.random() * 90 + 10),
+    base + Math.floor(Math.random() * 900 + 100),
+    base + '_' + new Date().getFullYear().toString().slice(-2),
+    base + '_gifter',
+    base + '_wishes',
+  ];
+  for (const c of candidates) {
+    if (suggestions.length >= 3) break;
+    if (!(await isUsernameTaken(c))) suggestions.push(c);
+  }
+  return suggestions;
+}
+
+document.getElementById('editUsername').addEventListener('input', async e => {
+  clearTimeout(usernameTimeout);
+  const val = e.target.value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
+  e.target.value = val;
+  const status = document.getElementById('usernameStatus');
+  const suggWrap = document.getElementById('usernameSuggestion');
+  const chips = document.getElementById('suggestionChips');
+
+  // Don't flag current username as taken
+  if (!userDoc || val.length < 3 || val === userDoc.username) {
+    status.textContent = '';
+    suggWrap.style.display = 'none';
+    return;
   }
 
-  // ── Username availability check ──
-  let usernameTimeout;
-  document.getElementById('editUsername').addEventListener('input', async e => {
-    clearTimeout(usernameTimeout);
-    const val = e.target.value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
-    e.target.value = val;
-    const status = document.getElementById('usernameStatus');
-    if (!userDoc || val.length < 3 || val === userDoc.username) { status.textContent=''; return; }
-    usernameTimeout = setTimeout(async () => {
-      const q = query(collection(db,'users'), where('username','==',val), limit(1));
-      const snap = await getDocs(q);
-      if (snap.empty) { status.style.color='#1A7A40'; status.textContent='✓ Username available'; }
-      else { status.style.color='var(--crimson)'; status.textContent='✗ Username taken'; }
-    }, 400);
-  });
-
-  // ── Save Avatar ──
-  document.getElementById('saveAvatarBtn').addEventListener('click', async () => {
-    if (!currentUser) return toast('Not signed in','error');
-    try {
-      await setDoc(doc(db,'users',currentUser.uid), { avatarEmoji: selectedAvatar }, { merge: true });
-      userDoc = { ...userDoc, avatarEmoji: selectedAvatar };
-      toast('Avatar saved! ✓','success');
-    } catch(e) {
-      console.error(e);
-      toast('Failed to save avatar: ' + e.message,'error');
-    }
-  });
-
-  // ── Save Basic Info ──
-  document.getElementById('saveBasicBtn').addEventListener('click', async () => {
-    if (!currentUser) return toast('Not signed in','error');
-    const name = document.getElementById('editName').value.trim();
-    const username = document.getElementById('editUsername').value.trim().toLowerCase();
-    const about = document.getElementById('editAbout').value.trim();
-    if (!name) return toast('Display name is required','error');
-    if (username.length < 3) return toast('Username must be at least 3 characters','error');
-    if (wordCount(about) > 100) return toast('About section exceeds 100 words','error');
-    if (username !== userDoc.username) {
-      const q = query(collection(db,'users'), where('username','==',username), limit(1));
-      const snap = await getDocs(q);
-      if (!snap.empty) return toast('Username already taken','error');
-    }
-    try {
-      await setDoc(doc(db,'users',currentUser.uid), {
-        displayName: name,
-        displayNameLower: name.toLowerCase(),
-        username,
-        about,
-        avatarEmoji: selectedAvatar,
-        email: currentUser.email,
-        createdAt: serverTimestamp()
-      }, { merge: true });
-      userDoc = { ...userDoc, displayName: name, username, about, avatarEmoji: selectedAvatar };
-      toast('Profile updated! ✓','success');
-    } catch(e) {
-      console.error(e);
-      toast('Failed to save: ' + e.message,'error');
-    }
-  });
-
-  // ── Save Address ──
-  document.getElementById('saveAddressBtn').addEventListener('click', async () => {
-    if (!currentUser) return toast('Not signed in','error');
-    const address = document.getElementById('editAddress').value.trim();
-    try {
-      await setDoc(doc(db,'users',currentUser.uid), { address }, { merge: true });
-      userDoc = { ...userDoc, address };
-      toast('Address saved! ✓','success');
-    } catch(e) {
-      console.error(e);
-      toast('Failed to save address: ' + e.message,'error');
-    }
-  });
-
-  // ── Save Privacy ──
-  document.getElementById('savePrivacyBtn').addEventListener('click', async () => {
-    if (!currentUser) return toast('Not signed in','error');
-    const isPrivate = document.getElementById('togglePrivate').checked;
-    let addressVisibility = 'connections';
-    if (document.getElementById('addrAll').checked) addressVisibility = 'all';
-    else if (document.getElementById('addrHidden').checked) addressVisibility = 'hidden';
-    try {
-      await setDoc(doc(db,'users',currentUser.uid), { isPrivate, addressVisibility }, { merge: true });
-      userDoc = { ...userDoc, isPrivate, addressVisibility };
-      toast('Privacy settings saved! ✓','success');
-    } catch(e) {
-      console.error(e);
-      toast('Failed to save privacy settings: ' + e.message,'error');
-    }
-  });
-
-  // ── Delete Account ──
-  const deleteModal = document.getElementById('deleteAccountModal');
-  const deleteInput = document.getElementById('deleteConfirmInput');
-  const confirmDeleteBtn = document.getElementById('confirmDeleteAccountBtn');
-
-  // Open modal
-  document.getElementById('deleteAccountBtn').addEventListener('click', () => {
-    deleteInput.value = '';
-    confirmDeleteBtn.disabled = true;
-    confirmDeleteBtn.style.opacity = '0.4';
-    confirmDeleteBtn.style.cursor = 'not-allowed';
-    document.getElementById('deleteSpinner').style.display = 'none';
-    deleteModal.style.display = 'flex';
-  });
-
-  // Close modal
-  document.getElementById('cancelDeleteAccountBtn').addEventListener('click', () => {
-    deleteModal.style.display = 'none';
-  });
-  deleteModal.addEventListener('click', e => {
-    if (e.target === deleteModal) deleteModal.style.display = 'none';
-  });
-
-  // Enable confirm button only when user types DELETE
-  deleteInput.addEventListener('input', () => {
-    const ready = deleteInput.value.trim() === 'DELETE';
-    confirmDeleteBtn.disabled = !ready;
-    confirmDeleteBtn.style.opacity = ready ? '1' : '0.4';
-    confirmDeleteBtn.style.cursor = ready ? 'pointer' : 'not-allowed';
-  });
-
-  // Confirm delete
-  confirmDeleteBtn.addEventListener('click', async () => {
-    if (!currentUser) return;
-    if (deleteInput.value.trim() !== 'DELETE') return;
-    confirmDeleteBtn.disabled = true;
-    document.getElementById('deleteSpinner').style.display = 'block';
-    try {
-      const { deleteDoc, getDocs: gd, collection: col } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
-      const { deleteUser } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
-
-      // 1. Delete all wishlist products
-      const productsSnap = await gd(col(db, 'wishlists', currentUser.uid, 'products'));
-      for (const p of productsSnap.docs) {
-        await deleteDoc(doc(db, 'wishlists', currentUser.uid, 'products', p.id));
-      }
-
-      // 2. Delete user Firestore document
-      await deleteDoc(doc(db, 'users', currentUser.uid));
-
-      // 3. Delete Firebase Auth account
-      await deleteUser(currentUser);
-
-      // 4. Redirect to home
-      toast('Account deleted. Goodbye! 👋', 'info');
-      setTimeout(() => { window.location.href = 'index.html'; }, 1500);
-
-    } catch(e) {
-      console.error(e);
-      document.getElementById('deleteSpinner').style.display = 'none';
-      confirmDeleteBtn.disabled = false;
-      if (e.code === 'auth/requires-recent-login') {
-        toast('For security, please sign out and sign back in before deleting your account.', 'error');
+  usernameTimeout = setTimeout(async () => {
+    const taken = await isUsernameTaken(val);
+    if (!taken) {
+      status.style.color = '#1A7A40';
+      status.textContent = '✓ Username available';
+      suggWrap.style.display = 'none';
+    } else {
+      status.style.color = 'var(--crimson)';
+      status.textContent = '✗ Username taken';
+      const suggs = await generateSuggestions(val);
+      if (suggs.length) {
+        chips.innerHTML = suggs.map(s =>
+          `<span style="cursor:pointer;background:var(--warm-light);border:1px solid var(--border);
+            border-radius:20px;padding:2px 10px;color:var(--text-dark);font-weight:600;"
+            data-name="${s}">${s}</span>`
+        ).join('');
+        chips.querySelectorAll('span').forEach(chip => {
+          chip.addEventListener('click', () => {
+            document.getElementById('editUsername').value = chip.dataset.name;
+            status.style.color = '#1A7A40';
+            status.textContent = '✓ Username available';
+            suggWrap.style.display = 'none';
+          });
+        });
+        suggWrap.style.display = 'block';
       } else {
-        toast('Error deleting account: ' + e.message, 'error');
+        suggWrap.style.display = 'none';
       }
     }
-  });
+  }, 400);
+});
+
+// ── Save Avatar ───────────────────────────────────────────────
+document.getElementById('saveAvatarBtn').addEventListener('click', async () => {
+  if (!currentUser) return toast('Not signed in','error');
+  try {
+    // FIX: use updateDoc — only touches the one field, never risks wiping others
+    await updateDoc(doc(db,'users',currentUser.uid), { avatarEmoji: selectedAvatar });
+    userDoc = { ...userDoc, avatarEmoji: selectedAvatar };
+    toast('Avatar saved! ✓','success');
+  } catch(e) {
+    console.error(e);
+    toast('Failed to save avatar: ' + e.message,'error');
+  }
+});
+
+// ── Save Basic Info ───────────────────────────────────────────
+document.getElementById('saveBasicBtn').addEventListener('click', async () => {
+  if (!currentUser) return toast('Not signed in','error');
+  const name     = document.getElementById('editName').value.trim();
+  const username = document.getElementById('editUsername').value.trim().toLowerCase();
+  const about    = document.getElementById('editAbout').value.trim();
+
+  if (!name) return toast('Display name is required','error');
+  if (username.length < 3) return toast('Username must be at least 3 characters','error');
+  if (wordCount(about) > 100) return toast('About section exceeds 100 words','error');
+
+  if (username !== userDoc.username) {
+    const taken = await isUsernameTaken(username);
+    if (taken) return toast('Username already taken','error');
+  }
+
+  try {
+    // FIX: use updateDoc — never touches connectionCount, address, createdAt, etc.
+    await updateDoc(doc(db,'users',currentUser.uid), {
+      displayName:      name,
+      displayNameLower: name.toLowerCase(),
+      username,
+      about,
+      avatarEmoji:      selectedAvatar,
+    });
+    userDoc = { ...userDoc, displayName: name, username, about, avatarEmoji: selectedAvatar };
+    toast('Profile updated! ✓','success');
+  } catch(e) {
+    console.error(e);
+    toast('Failed to save: ' + e.message,'error');
+  }
+});
+
+// ── Save Address ──────────────────────────────────────────────
+document.getElementById('saveAddressBtn').addEventListener('click', async () => {
+  if (!currentUser) return toast('Not signed in','error');
+  const address = document.getElementById('editAddress').value.trim();
+  try {
+    await updateDoc(doc(db,'users',currentUser.uid), { address });
+    userDoc = { ...userDoc, address };
+    toast('Address saved! ✓','success');
+  } catch(e) {
+    console.error(e);
+    toast('Failed to save address: ' + e.message,'error');
+  }
+});
+
+// ── Save Privacy ──────────────────────────────────────────────
+document.getElementById('savePrivacyBtn').addEventListener('click', async () => {
+  if (!currentUser) return toast('Not signed in','error');
+  const isPrivate = document.getElementById('togglePrivate').checked;
+  let addressVisibility = 'connections';
+  if (document.getElementById('addrAll').checked)    addressVisibility = 'all';
+  else if (document.getElementById('addrHidden').checked) addressVisibility = 'hidden';
+  try {
+    await updateDoc(doc(db,'users',currentUser.uid), { isPrivate, addressVisibility });
+    userDoc = { ...userDoc, isPrivate, addressVisibility };
+    toast('Privacy settings saved! ✓','success');
+  } catch(e) {
+    console.error(e);
+    toast('Failed to save privacy settings: ' + e.message,'error');
+  }
+});
+
+// ── Delete Account ────────────────────────────────────────────
+const deleteModal    = document.getElementById('deleteAccountModal');
+const deleteInput    = document.getElementById('deleteConfirmInput');
+const confirmDeleteBtn = document.getElementById('confirmDeleteAccountBtn');
+
+document.getElementById('deleteAccountBtn').addEventListener('click', () => {
+  deleteInput.value = '';
+  confirmDeleteBtn.disabled = true;
+  confirmDeleteBtn.style.opacity = '0.4';
+  confirmDeleteBtn.style.cursor = 'not-allowed';
+  document.getElementById('deleteSpinner').style.display = 'none';
+  deleteModal.style.display = 'flex';
+});
+document.getElementById('cancelDeleteAccountBtn').addEventListener('click', () => {
+  deleteModal.style.display = 'none';
+});
+deleteModal.addEventListener('click', e => {
+  if (e.target === deleteModal) deleteModal.style.display = 'none';
+});
+deleteInput.addEventListener('input', () => {
+  const ready = deleteInput.value.trim() === 'DELETE';
+  confirmDeleteBtn.disabled = !ready;
+  confirmDeleteBtn.style.opacity = ready ? '1' : '0.4';
+  confirmDeleteBtn.style.cursor  = ready ? 'pointer' : 'not-allowed';
+});
+
+confirmDeleteBtn.addEventListener('click', async () => {
+  if (!currentUser) return;
+  if (deleteInput.value.trim() !== 'DELETE') return;
+  confirmDeleteBtn.disabled = true;
+  document.getElementById('deleteSpinner').style.display = 'block';
+  try {
+    const { deleteDoc, getDocs: gd, collection: col } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js');
+    const { deleteUser } = await import('https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js');
+    const productsSnap = await gd(col(db, 'wishlists', currentUser.uid, 'products'));
+    for (const p of productsSnap.docs) {
+      await deleteDoc(doc(db, 'wishlists', currentUser.uid, 'products', p.id));
+    }
+    await deleteDoc(doc(db, 'users', currentUser.uid));
+    await deleteUser(currentUser);
+    toast('Account deleted. Goodbye! 👋','info');
+    setTimeout(() => { window.location.href = 'index.html'; }, 1500);
+  } catch(e) {
+    console.error(e);
+    document.getElementById('deleteSpinner').style.display = 'none';
+    confirmDeleteBtn.disabled = false;
+    if (e.code === 'auth/requires-recent-login') {
+      toast('For security, please sign out and sign back in before deleting your account.','error');
+    } else {
+      toast('Error deleting account: ' + e.message,'error');
+    }
+  }
+});
 </script>
 </body>
 </html>

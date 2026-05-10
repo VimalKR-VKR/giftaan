@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Sign In – Giftaan</title>
-  <link rel="stylesheet" href="css/styles.css"/>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Sign In – Giftaan</title>
+<link rel="stylesheet" href="css/styles.css"/>
 </head>
 <body>
 <div class="auth-wrap">
@@ -12,7 +12,6 @@
     <div class="auth-logo">Gift<span>aan</span></div>
     <div class="auth-subtitle" id="authSubtitle">Welcome back 🎁</div>
 
-    <!-- Google Button -->
     <button class="google-btn" id="googleBtn">
       <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
       Continue with Google
@@ -44,6 +43,10 @@
         <label>Username <span style="color:var(--text-light);font-weight:400">(used in your profile link)</span></label>
         <input type="text" class="form-control" id="regUsername" placeholder="e.g. ravi_kr" maxlength="30"/>
         <div id="usernameStatus" style="font-size:12px;margin-top:4px;"></div>
+        <!-- FIX: suggestion chip shown when username is taken -->
+        <div id="usernameSuggestion" style="display:none;margin-top:6px;font-size:12px;color:var(--text-muted);">
+          Try: <span id="suggestionChips" style="display:inline-flex;gap:6px;flex-wrap:wrap;"></span>
+        </div>
       </div>
       <div class="form-group">
         <label>Email</label>
@@ -53,13 +56,10 @@
         <label>Password</label>
         <input type="password" class="form-control" id="regPassword" placeholder="Min 6 characters"/>
       </div>
-
-      <!-- Avatar Picker -->
       <div class="form-group">
         <label>Choose your avatar</label>
         <div class="avatar-grid" id="avatarGrid"></div>
       </div>
-
       <button class="btn btn-primary btn-full" id="registerBtn">Create Account</button>
       <div class="auth-switch">Already have an account? <a href="#" id="switchToLogin">Sign in</a></div>
     </div>
@@ -69,144 +69,205 @@
 <div id="toast-container"></div>
 
 <script type="module">
-  import { auth, db } from './js/firebase-config.js';
-  import { AVATARS, toast } from './js/utils.js';
-  import {
-    createUserWithEmailAndPassword,
-    signInWithEmailAndPassword,
-    GoogleAuthProvider,
-    signInWithPopup,
-    onAuthStateChanged
-  } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-  import {
-    doc, setDoc, getDoc, getDocs, collection, query, where, limit, serverTimestamp
-  } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { auth, db } from './js/firebase-config.js';
+import { AVATARS, toast } from './js/utils.js';
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithPopup,
+  onAuthStateChanged
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import {
+  doc, setDoc, getDoc, getDocs, collection, query, where, limit, serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-  // Redirect if already signed in
-  onAuthStateChanged(auth, user => { if (user) window.location.href = 'dashboard.html'; });
+onAuthStateChanged(auth, user => { if (user) window.location.href = 'dashboard.html'; });
 
-  const params = new URLSearchParams(location.search);
-  let isRegister = params.get('mode') === 'register';
-  let selectedAvatar = AVATARS[0];
+const params = new URLSearchParams(location.search);
+let isRegister = params.get('mode') === 'register';
+let selectedAvatar = AVATARS[0];
 
-  function showMode() {
-    document.getElementById('loginForm').classList.toggle('hidden', isRegister);
-    document.getElementById('registerForm').classList.toggle('hidden', !isRegister);
-    document.getElementById('authSubtitle').textContent = isRegister ? 'Create your wishlist 🎁' : 'Welcome back 🎁';
-  }
-  showMode();
+function showMode() {
+  document.getElementById('loginForm').classList.toggle('hidden', isRegister);
+  document.getElementById('registerForm').classList.toggle('hidden', !isRegister);
+  document.getElementById('authSubtitle').textContent = isRegister ? 'Create your wishlist 🎁' : 'Welcome back 🎁';
+}
+showMode();
 
-  // Avatar grid
-  const grid = document.getElementById('avatarGrid');
-  AVATARS.forEach(emoji => {
-    const el = document.createElement('div');
-    el.className = 'avatar-option' + (emoji === selectedAvatar ? ' selected' : '');
-    el.textContent = emoji;
-    el.addEventListener('click', () => {
-      selectedAvatar = emoji;
-      document.querySelectorAll('.avatar-option').forEach(a => a.classList.remove('selected'));
-      el.classList.add('selected');
-    });
-    grid.appendChild(el);
+// Avatar grid
+const grid = document.getElementById('avatarGrid');
+AVATARS.forEach(emoji => {
+  const el = document.createElement('div');
+  el.className = 'avatar-option' + (emoji === selectedAvatar ? ' selected' : '');
+  el.textContent = emoji;
+  el.addEventListener('click', () => {
+    selectedAvatar = emoji;
+    document.querySelectorAll('.avatar-option').forEach(a => a.classList.remove('selected'));
+    el.classList.add('selected');
   });
+  grid.appendChild(el);
+});
 
-  document.getElementById('switchToRegister').addEventListener('click', e => { e.preventDefault(); isRegister = true; showMode(); });
-  document.getElementById('switchToLogin').addEventListener('click', e => { e.preventDefault(); isRegister = false; showMode(); });
+document.getElementById('switchToRegister').addEventListener('click', e => { e.preventDefault(); isRegister = true; showMode(); });
+document.getElementById('switchToLogin').addEventListener('click', e => { e.preventDefault(); isRegister = false; showMode(); });
 
-  // Username check
-  let usernameTimeout;
-  document.getElementById('regUsername').addEventListener('input', async e => {
-    clearTimeout(usernameTimeout);
-    const val = e.target.value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
-    e.target.value = val;
-    const status = document.getElementById('usernameStatus');
-    if (val.length < 3) { status.textContent = ''; return; }
-    usernameTimeout = setTimeout(async () => {
-      const q = query(collection(db,'users'), where('username','==',val), limit(1));
-      const snap = await getDocs(q);
-      if (snap.empty) { status.style.color='#1A7A40'; status.textContent='✓ Username available'; }
-      else { status.style.color='var(--crimson)'; status.textContent='✗ Username taken'; }
-    }, 400);
-  });
+// ── FIX: Username check + unique suggestions ─────────────────
+let usernameTimeout;
 
-  // Email/Password Register
-  document.getElementById('registerBtn').addEventListener('click', async () => {
-    const name = document.getElementById('regName').value.trim();
-    const username = document.getElementById('regUsername').value.trim().toLowerCase();
-    const email = document.getElementById('regEmail').value.trim();
-    const password = document.getElementById('regPassword').value;
-    if (!name||!username||!email||!password) return toast('Please fill all fields','error');
-    if (username.length < 3) return toast('Username must be at least 3 characters','error');
-    if (password.length < 6) return toast('Password must be at least 6 characters','error');
-    // Check username
-    const q = query(collection(db,'users'), where('username','==',username), limit(1));
-    const snap = await getDocs(q);
-    if (!snap.empty) return toast('Username already taken','error');
-    try {
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await saveUserDoc(cred.user.uid, name, username, cred.user.email, AVATARS[Math.floor(Math.random()*AVATARS.length)], cred.user.photoURL);
-      window.location.href = 'dashboard.html';
-    } catch(e) { toast(e.message,'error'); }
-  });
-
-  // Email/Password Login
-  document.getElementById('loginBtn').addEventListener('click', async () => {
-    const email = document.getElementById('loginEmail').value.trim();
-    const password = document.getElementById('loginPassword').value;
-    if (!email||!password) return toast('Please fill all fields','error');
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      window.location.href = 'dashboard.html';
-    } catch(e) { toast('Invalid email or password','error'); }
-  });
-
-  // Google Sign In
-  document.getElementById('googleBtn').addEventListener('click', async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      const cred = await signInWithPopup(auth, provider);
-      const exists = await getDoc(doc(db,'users',cred.user.uid));
-      if (!exists.exists()) {
-        // New Google user — need username
-        const name = cred.user.displayName || 'User';
-        const base = name.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'').slice(0,20);
-        let username = base;
-        let i = 1;
-        while (true) {
-          const q = query(collection(db,'users'), where('username','==',username), limit(1));
-          const snap = await getDocs(q);
-          if (snap.empty) break;
-          username = base + i++;
-        }
-        await saveUserDoc(cred.user.uid, name, username, cred.user.email, AVATARS[Math.floor(Math.random()*AVATARS.length)]);
-      }
-      window.location.href = 'dashboard.html';
-    } catch(e) { toast(e.message,'error'); }
-  });
-
-  async function saveUserDoc(uid, name, username, email, avatar, photoURL = null) {
-  await setDoc(doc(db,'users',uid), {
-    displayName: name,
-    displayNameLower: name.toLowerCase(),
-    username: username.toLowerCase(),
-    email: email,
-    avatarEmoji: avatar,
-    photoURL: photoURL,       // ← ADD THIS LINE
-    about: '',
-    address: '',
-    isPrivate: false,
-    addressVisibility: 'connections',
-    connectionCount: 0,
-    createdAt: serverTimestamp()
-  });
+async function isUsernameTaken(username) {
+  const q = query(collection(db,'users'), where('username','==',username), limit(1));
+  const snap = await getDocs(q);
+  return !snap.empty;
 }
 
-  // Enter key support
-  document.addEventListener('keydown', e => {
-    if (e.key !== 'Enter') return;
-    if (!isRegister) document.getElementById('loginBtn').click();
-    else document.getElementById('registerBtn').click();
+// Generate up to 3 unique username suggestions based on a base name
+async function generateSuggestions(base) {
+  const suggestions = [];
+  const candidates = [
+    base + '_' + Math.floor(Math.random() * 90 + 10),         // e.g. ravi_42
+    base + Math.floor(Math.random() * 900 + 100),              // e.g. ravi347
+    base + '_' + new Date().getFullYear().toString().slice(-2), // e.g. ravi_25
+    base + '_gifter',
+    base + '_wishes',
+  ];
+  for (const c of candidates) {
+    if (suggestions.length >= 3) break;
+    const taken = await isUsernameTaken(c);
+    if (!taken) suggestions.push(c);
+  }
+  return suggestions;
+}
+
+document.getElementById('regUsername').addEventListener('input', async e => {
+  clearTimeout(usernameTimeout);
+  const val = e.target.value.trim().toLowerCase().replace(/[^a-z0-9_]/g,'');
+  e.target.value = val;
+  const status = document.getElementById('usernameStatus');
+  const suggWrap = document.getElementById('usernameSuggestion');
+  const chips = document.getElementById('suggestionChips');
+
+  if (val.length < 3) {
+    status.textContent = '';
+    suggWrap.style.display = 'none';
+    return;
+  }
+
+  usernameTimeout = setTimeout(async () => {
+    const taken = await isUsernameTaken(val);
+    if (!taken) {
+      status.style.color = '#1A7A40';
+      status.textContent = '✓ Username available';
+      suggWrap.style.display = 'none';
+    } else {
+      status.style.color = 'var(--crimson)';
+      status.textContent = '✗ Username taken';
+      // Show suggestions
+      const suggs = await generateSuggestions(val);
+      if (suggs.length) {
+        chips.innerHTML = suggs.map(s =>
+          `<span style="cursor:pointer;background:var(--warm-light);border:1px solid var(--border);
+            border-radius:20px;padding:2px 10px;color:var(--text-dark);font-weight:600;"
+            data-name="${s}">${s}</span>`
+        ).join('');
+        chips.querySelectorAll('span').forEach(chip => {
+          chip.addEventListener('click', () => {
+            document.getElementById('regUsername').value = chip.dataset.name;
+            status.style.color = '#1A7A40';
+            status.textContent = '✓ Username available';
+            suggWrap.style.display = 'none';
+          });
+        });
+        suggWrap.style.display = 'block';
+      } else {
+        suggWrap.style.display = 'none';
+      }
+    }
+  }, 400);
+});
+
+// ── Email/Password Register ───────────────────────────────────
+document.getElementById('registerBtn').addEventListener('click', async () => {
+  const name     = document.getElementById('regName').value.trim();
+  const username = document.getElementById('regUsername').value.trim().toLowerCase();
+  const email    = document.getElementById('regEmail').value.trim();
+  const password = document.getElementById('regPassword').value;
+
+  if (!name||!username||!email||!password) return toast('Please fill all fields','error');
+  if (username.length < 3) return toast('Username must be at least 3 characters','error');
+  if (password.length < 6) return toast('Password must be at least 6 characters','error');
+
+  const taken = await isUsernameTaken(username);
+  if (taken) return toast('Username already taken — please choose another','error');
+
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await saveNewUserDoc(cred.user.uid, name, username, email, selectedAvatar);
+    window.location.href = 'dashboard.html';
+  } catch(e) { toast(e.message,'error'); }
+});
+
+// ── Email/Password Login ──────────────────────────────────────
+document.getElementById('loginBtn').addEventListener('click', async () => {
+  const email    = document.getElementById('loginEmail').value.trim();
+  const password = document.getElementById('loginPassword').value;
+  if (!email||!password) return toast('Please fill all fields','error');
+  try {
+    await signInWithEmailAndPassword(auth, email, password);
+    window.location.href = 'dashboard.html';
+  } catch(e) { toast('Invalid email or password','error'); }
+});
+
+// ── Google Sign In ────────────────────────────────────────────
+document.getElementById('googleBtn').addEventListener('click', async () => {
+  try {
+    const provider = new GoogleAuthProvider();
+    const cred = await signInWithPopup(auth, provider);
+
+    // FIX: only create a doc if one doesn't already exist — never overwrite
+    const existingDoc = await getDoc(doc(db,'users',cred.user.uid));
+    if (!existingDoc.exists()) {
+      const name = cred.user.displayName || 'User';
+      const base = name.toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'').slice(0,20) || 'user';
+      // Find a unique username
+      let username = base;
+      let i = 1;
+      while (await isUsernameTaken(username)) {
+        username = base + i++;
+      }
+      await saveNewUserDoc(cred.user.uid, name, username, cred.user.email, AVATARS[Math.floor(Math.random()*AVATARS.length)]);
+    }
+
+    window.location.href = 'dashboard.html';
+  } catch(e) { toast(e.message,'error'); }
+});
+
+// ── FIX: saveNewUserDoc — only for brand new accounts ────────
+// Uses setDoc WITHOUT merge so we get clean defaults,
+// but is ONLY called when the user doc doesn't exist yet.
+async function saveNewUserDoc(uid, name, username, email, avatar) {
+  await setDoc(doc(db,'users',uid), {
+    displayName:        name,
+    displayNameLower:   name.toLowerCase(),
+    username:           username.toLowerCase(),
+    email:              email,
+    avatarEmoji:        avatar,
+    about:              '',
+    address:            '',
+    isPrivate:          false,
+    addressVisibility:  'connections',
+    connectionCount:    0,
+    createdAt:          serverTimestamp()
   });
+  // No { merge: true } here intentionally — this only runs for new users
+}
+
+// Enter key support
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  if (!isRegister) document.getElementById('loginBtn').click();
+  else document.getElementById('registerBtn').click();
+});
 </script>
 </body>
 </html>
