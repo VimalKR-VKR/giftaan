@@ -25,7 +25,7 @@ export const db = getFirestore(app);
 // AMAZON AFFILIATE TAG
 // Replace with your actual affiliate tag once you have it
 // ============================================================
-export const AFFILIATE_TAG = "YOUR-AFFILIATE-TAG-21";
+export const AFFILIATE_TAG = "29081-21";
 
 export function buildAffiliateUrl(amazonUrl) {
   try {
