@@ -8,7 +8,7 @@ import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-aut
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBJNJ6S6Td5gyEla3BNwqhwE8f2_RGTSTU",
+  apiKey: "YOUR_NEW_RESTRICTED_KEY",
   authDomain: "giftaan-vkr.firebaseapp.com",
   projectId: "giftaan-vkr",
   storageBucket: "giftaan-vkr.firebasestorage.app",
