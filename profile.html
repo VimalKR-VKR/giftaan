@@ -7,7 +7,6 @@
 <link rel="stylesheet" href="css/styles.css"/>
 </head>
 <body>
-
 <nav class="navbar">
   <div class="navbar-inner">
     <a href="dashboard.html" class="navbar-brand">Gift<span>aan</span></a>
@@ -26,7 +25,6 @@
   <div style="text-align:center;padding:60px 20px;color:var(--text-muted);">Loading…</div>
 </div>
 
-<!-- Connection Request Modal -->
 <div class="modal-overlay" id="connReqModal">
   <div class="modal" style="max-width:380px;">
     <div class="modal-header">
@@ -45,395 +43,273 @@
 
 <script type="module">
 import { auth, db } from './js/firebase-config.js';
-import { toast, getUserByUsername, renderNav, initSearch, formatPrice } from './js/utils.js';
+import { toast, getUserByUsername, getUser, renderNav, initSearch, formatPrice } from './js/utils.js';
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
-  collection, getDocs, query, orderBy, doc, getDoc,
-  setDoc, serverTimestamp, deleteDoc, updateDoc, increment
+  collection, getDocs, query, orderBy, doc, getDoc, setDoc, serverTimestamp, deleteDoc, updateDoc, increment
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 const params = new URLSearchParams(location.search);
 const username = params.get('u');
-if (!username) { window.location.href = 'index.html'; }
+if (!username) window.location.href = 'index.html';
 
-let viewerUser  = null;
+let viewerUser = null;
 let profileUser = null;
-let isOwner     = false;
+let isOwner = false;
 let connectionStatus = null; // null | 'pending_sent' | 'pending_received' | 'connected'
 let allProducts = [];
 
 onAuthStateChanged(auth, async viewer => {
   viewerUser = viewer;
   await renderNav(viewer);
-  initSearch('navSearchInput', 'navSearchResults');
+  initSearch('navSearchInput','navSearchResults');
   await loadProfile();
 });
 
-// ── Load Profile ──────────────────────────────────────────────
 async function loadProfile() {
-  try {
-    profileUser = await getUserByUsername(username);
-  } catch(e) {
-    showError('Could not load profile. Please try again.');
-    return;
-  }
+  profileUser = await getUserByUsername(username);
   if (!profileUser) {
-    showError(`No user found with username "@${username}".`);
+    document.getElementById('profileContent').innerHTML = `<div class="empty-state"><div class="empty-icon">😕</div><h3>Profile not found</h3><p>This user doesn't exist or has changed their username.</p></div>`;
     return;
   }
-
   document.title = `${profileUser.displayName}'s Wishlist – Giftaan`;
-  isOwner = !!(viewerUser && viewerUser.uid === profileUser.uid);
-
+  isOwner = viewerUser && viewerUser.uid === profileUser.uid;
   if (viewerUser && !isOwner) {
     connectionStatus = await getConnectionStatus(viewerUser.uid, profileUser.uid);
   }
-
   if (profileUser.isPrivate && !isOwner && connectionStatus !== 'connected') {
     renderPrivateBlock();
     return;
   }
-
   renderHero();
-  await loadProducts();
+  loadProducts();
 }
 
-function showError(msg) {
-  document.getElementById('profileContent').innerHTML = `
-    <div class="empty-state">
-      <div class="empty-icon">😕</div>
-      <h3>Profile not found</h3>
-      <p>${msg}</p>
-      <a href="dashboard.html" class="btn btn-primary btn-sm" style="margin-top:16px;">Go to Dashboard</a>
-    </div>`;
-}
-
-// ── Connection Status ─────────────────────────────────────────
-// Data model:
-//   A sends request to B:
-//     users/B/connectionRequests/A  → { status:'pending', from: A }
-//     users/A/sentRequests/B        → { status:'pending', to: B }
-//
-//   B accepts:
-//     users/B/connectionRequests/A  → { status:'accepted', from: A }  (updated)
-//     users/A/connectionRequests/B  → { status:'accepted', from: A }  (mirror, written on accept)
-//     users/A/sentRequests/B        → { status:'accepted' }           (updated on accept)
-//
-// From viewer looking at profileUser's page:
-//   profile's inbox has viewerUid doc  → viewer sent the request
-//   viewer's  inbox has profileUid doc → profile sent request to viewer
+// ── FIX: Correctly determine connection status by checking the `from` field ──
 async function getConnectionStatus(viewerUid, profileUid) {
-  try {
-    // Did viewer send a request? It lives in profile's inbox.
-    const sentSnap = await getDoc(
-      doc(db, 'users', profileUid, 'connectionRequests', viewerUid)
-    );
-    if (sentSnap.exists()) {
-      return sentSnap.data().status === 'accepted' ? 'connected' : 'pending_sent';
-    }
-    // Did profile send a request to viewer? It lives in viewer's inbox.
-    const receivedSnap = await getDoc(
-      doc(db, 'users', viewerUid, 'connectionRequests', profileUid)
-    );
-    if (receivedSnap.exists()) {
-      return receivedSnap.data().status === 'accepted' ? 'connected' : 'pending_received';
-    }
-  } catch(e) { console.error('Connection status error:', e); }
+  // Check viewer's own inbox — did profile send viewer a request?
+  const receivedSnap = await getDoc(doc(db, 'users', viewerUid, 'connectionRequests', profileUid));
+  if (receivedSnap.exists()) {
+    const data = receivedSnap.data();
+    if (data.status === 'accepted') return 'connected';
+    // The doc is in viewer's inbox, so profileUid is the sender
+    return 'pending_received';
+  }
+
+  // Check profile's inbox — did viewer send profile a request?
+  const sentSnap = await getDoc(doc(db, 'users', profileUid, 'connectionRequests', viewerUid));
+  if (sentSnap.exists()) {
+    const data = sentSnap.data();
+    if (data.status === 'accepted') return 'connected';
+    // The doc is in profile's inbox, so viewer is the sender
+    return 'pending_sent';
+  }
+
   return null;
 }
 
-// ── Avatar helper ─────────────────────────────────────────────
-function avatarHtml(user, size = 50) {
-  return user.avatarEmoji
-    ? `<span style="font-size:${size}px">${user.avatarEmoji}</span>`
-    : (user.displayName || 'U')[0].toUpperCase();
-}
-
-// ── Render Hero ───────────────────────────────────────────────
-function renderHero() {
-  document.getElementById('profileHero').innerHTML = `
-    <div class="profile-hero">
-      <div class="profile-info-row">
-        <div class="profile-avatar-wrap">
-          <div class="profile-avatar">${avatarHtml(profileUser)}</div>
-        </div>
-        <div class="profile-meta">
-          <div class="profile-name">${profileUser.displayName}</div>
-          <div class="profile-username">
-            @${profileUser.username} · ${profileUser.connectionCount || 0} connections
-            ${profileUser.isPrivate ? '· <span class="tag tag-red">🔒 Private</span>' : ''}
-          </div>
-          ${profileUser.about ? `<div class="profile-about">${profileUser.about}</div>` : ''}
-        </div>
-        <div class="profile-actions-row" id="heroActions"></div>
-      </div>
-      <div class="profile-tabs">
-        <div class="profile-tab active">Wishlist</div>
-      </div>
-    </div>`;
-
-  if (isOwner) {
-    document.getElementById('heroActions').innerHTML = `
-      <a href="profile-edit.html" class="btn btn-secondary btn-sm">✏️ Edit Profile</a>
-      <button class="btn btn-ghost btn-sm" id="shareLinkBtn"
-              style="color:var(--gold);border-color:var(--gold)">🔗 Share Link</button>`;
-    document.getElementById('shareLinkBtn').addEventListener('click', () => {
-      navigator.clipboard.writeText(location.href)
-        .then(() => toast('Profile link copied!', 'success'));
-    });
-  } else {
-    attachConnectionBtn('heroActions');
-  }
-}
-
-// ── Private Block ─────────────────────────────────────────────
 function renderPrivateBlock() {
   document.getElementById('profileHero').innerHTML = `
     <div class="profile-hero">
       <div class="profile-info-row">
         <div class="profile-avatar-wrap">
-          <div class="profile-avatar">${avatarHtml(profileUser)}</div>
+          <div class="profile-avatar">${profileUser.avatarEmoji ? `<span style="font-size:50px">${profileUser.avatarEmoji}</span>` : (profileUser.displayName||'U')[0].toUpperCase()}</div>
         </div>
         <div class="profile-meta">
           <div class="profile-name">${profileUser.displayName}</div>
-          <div class="profile-username">
-            @${profileUser.username} · <span class="tag tag-red">🔒 Private</span>
-          </div>
+          <div class="profile-username">@${profileUser.username} · <span class="tag tag-red">🔒 Private</span></div>
           ${profileUser.about ? `<div class="profile-about">${profileUser.about}</div>` : ''}
         </div>
         <div class="profile-actions-row" id="heroActions"></div>
       </div>
-    </div>`;
-
+      <div style="height:24px;"></div>
+    </div>
+  `;
   document.getElementById('profileContent').innerHTML = `
     <div class="empty-state">
       <div class="empty-icon">🔒</div>
       <h3>This account is private</h3>
       <p>Connect with ${profileUser.displayName} to see their wishlist.</p>
-      <div id="connBtnWrap"
-           style="margin-top:16px;display:flex;gap:10px;justify-content:center;"></div>
-    </div>`;
-
-  // Each targets its own container ID — no shared button IDs between the two
-  attachConnectionBtn('heroActions');
-  attachConnectionBtn('connBtnWrap');
+      <div id="connBtnWrap"></div>
+    </div>
+  `;
+  renderConnectionBtn(document.getElementById('connBtnWrap'));
+  renderConnectionBtn(document.getElementById('heroActions'));
 }
 
-// ── Attach Connection Button ──────────────────────────────────
-// Uses createElement + addEventListener so two containers can render
-// buttons simultaneously without any ID collisions.
-function attachConnectionBtn(containerId) {
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  container.innerHTML = '';
+function renderHero() {
+  document.getElementById('profileHero').innerHTML = `
+    <div class="profile-hero">
+      <div class="profile-info-row">
+        <div class="profile-avatar-wrap">
+          <div class="profile-avatar">${profileUser.avatarEmoji ? `<span style="font-size:50px">${profileUser.avatarEmoji}</span>` : (profileUser.displayName||'U')[0].toUpperCase()}</div>
+        </div>
+        <div class="profile-meta">
+          <div class="profile-name">${profileUser.displayName}</div>
+          <div class="profile-username">@${profileUser.username} · ${profileUser.connectionCount||0} connections ${profileUser.isPrivate ? '· <span class="tag tag-red">🔒 Private</span>':''}</div>
+          ${profileUser.about ? `<div class="profile-about">${profileUser.about}</div>` : ''}
+        </div>
+        <div class="profile-actions-row" id="heroActions"></div>
+      </div>
+      <div class="profile-tabs">
+        <div class="profile-tab active" id="tabWishlist">Wishlist</div>
+      </div>
+    </div>
+  `;
+  const actions = document.getElementById('heroActions');
+  if (isOwner) {
+    actions.innerHTML = `
+      <a href="profile-edit.html" class="btn btn-secondary btn-sm">✏️ Edit Profile</a>
+      <button class="btn btn-ghost btn-sm" id="shareLinkBtn" style="color:var(--gold);border-color:var(--gold)">🔗 Share Link</button>
+    `;
+    document.getElementById('shareLinkBtn').addEventListener('click', () => {
+      navigator.clipboard.writeText(location.href).then(() => toast('Profile link copied!','success'));
+    });
+  } else {
+    renderConnectionBtn(actions);
+  }
+}
 
+function renderConnectionBtn(container) {
+  if (!container) return;
   if (!viewerUser) {
-    const a = document.createElement('a');
-    a.href = 'auth.html';
-    a.className = 'btn btn-primary btn-sm';
-    a.textContent = 'Sign in to connect';
-    container.appendChild(a);
+    container.innerHTML = `<a href="auth.html" class="btn btn-primary btn-sm">Sign in to connect</a>`;
     return;
   }
 
   if (connectionStatus === 'connected') {
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-ghost btn-sm';
-    btn.style.cssText = 'color:var(--crimson);border-color:var(--crimson);';
-    btn.textContent = '✓ Connected · Remove';
-    btn.addEventListener('click', handleRemoveConnection);
-    container.appendChild(btn);
+    container.innerHTML = `<button class="btn btn-ghost btn-sm" id="disconnectBtn" style="color:var(--crimson);border-color:var(--crimson);">✓ Connected · Remove</button>`;
+    document.getElementById('disconnectBtn')?.addEventListener('click', async () => {
+      try {
+        // FIX: also clean up sentRequests on both sides
+        await deleteDoc(doc(db,'users',profileUser.uid,'connectionRequests',viewerUser.uid));
+        await deleteDoc(doc(db,'users',viewerUser.uid,'connectionRequests',profileUser.uid));
+        await deleteDoc(doc(db,'users',viewerUser.uid,'sentRequests',profileUser.uid));
+        await deleteDoc(doc(db,'users',profileUser.uid,'sentRequests',viewerUser.uid));
+        await updateDoc(doc(db,'users',viewerUser.uid), { connectionCount: increment(-1) });
+        await updateDoc(doc(db,'users',profileUser.uid), { connectionCount: increment(-1) });
+        toast('Connection removed','info');
+        location.reload();
+      } catch(e) { toast('Error: ' + e.message, 'error'); }
+    });
 
   } else if (connectionStatus === 'pending_sent') {
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-ghost btn-sm';
-    btn.disabled = true;
-    btn.textContent = '⏳ Request Sent';
-    container.appendChild(btn);
+    container.innerHTML = `
+      <button class="btn btn-ghost btn-sm" id="cancelReqBtn" style="color:var(--crimson);border-color:var(--crimson);">⏳ Request Sent · Cancel</button>
+    `;
+    // FIX: allow cancelling a sent request directly from profile page
+    document.getElementById('cancelReqBtn')?.addEventListener('click', async () => {
+      try {
+        await deleteDoc(doc(db,'users',profileUser.uid,'connectionRequests',viewerUser.uid));
+        await deleteDoc(doc(db,'users',viewerUser.uid,'sentRequests',profileUser.uid));
+        toast('Request cancelled','info');
+        connectionStatus = null;
+        renderHero();
+      } catch(e) { toast('Error: ' + e.message, 'error'); }
+    });
 
   } else if (connectionStatus === 'pending_received') {
-    const acceptBtn = document.createElement('button');
-    acceptBtn.className = 'btn btn-primary btn-sm';
-    acceptBtn.textContent = '✓ Accept Request';
-    acceptBtn.addEventListener('click', handleAcceptConnection);
-
-    const declineBtn = document.createElement('button');
-    declineBtn.className = 'btn btn-ghost btn-sm';
-    declineBtn.textContent = '✗ Decline';
-    declineBtn.addEventListener('click', handleDeclineConnection);
-
-    container.appendChild(acceptBtn);
-    container.appendChild(declineBtn);
+    container.innerHTML = `
+      <button class="btn btn-primary btn-sm" id="acceptConnBtn">✓ Accept Request</button>
+      <button class="btn btn-ghost btn-sm" id="declineConnBtn">✗ Decline</button>
+    `;
+    document.getElementById('acceptConnBtn')?.addEventListener('click', async () => {
+      try {
+        // FIX: update both connectionRequests AND sender's sentRequests
+        await setDoc(doc(db,'users',viewerUser.uid,'connectionRequests',profileUser.uid),
+          { status:'accepted', updatedAt: serverTimestamp() }, { merge:true });
+        await setDoc(doc(db,'users',profileUser.uid,'connectionRequests',viewerUser.uid),
+          { status:'accepted', updatedAt: serverTimestamp() }, { merge:true });
+        await setDoc(doc(db,'users',profileUser.uid,'sentRequests',viewerUser.uid),
+          { status:'accepted', updatedAt: serverTimestamp() }, { merge:true });
+        await updateDoc(doc(db,'users',viewerUser.uid), { connectionCount: increment(1) });
+        await updateDoc(doc(db,'users',profileUser.uid), { connectionCount: increment(1) });
+        toast('Connected!','success');
+        location.reload();
+      } catch(e) { toast('Error: ' + e.message, 'error'); }
+    });
+    document.getElementById('declineConnBtn')?.addEventListener('click', async () => {
+      try {
+        // FIX: also clean up sender's sentRequests
+        await deleteDoc(doc(db,'users',viewerUser.uid,'connectionRequests',profileUser.uid));
+        await deleteDoc(doc(db,'users',profileUser.uid,'sentRequests',viewerUser.uid));
+        toast('Request declined','info');
+        connectionStatus = null;
+        renderHero();
+      } catch(e) { toast('Error: ' + e.message, 'error'); }
+    });
 
   } else {
-    // No connection — show connect button
-    const btn = document.createElement('button');
-    btn.className = 'btn btn-primary btn-sm';
-    btn.textContent = '+ Connect';
-    btn.addEventListener('click', () => {
-      document.getElementById('connReqText').textContent =
-        `Send a connection request to ${profileUser.displayName}?`;
+    container.innerHTML = `<button class="btn btn-primary btn-sm" id="connectBtn">+ Connect</button>`;
+    document.getElementById('connectBtn')?.addEventListener('click', () => {
+      document.getElementById('connReqText').textContent = `Send a connection request to ${profileUser.displayName}?`;
       document.getElementById('connReqModal').classList.add('open');
     });
-    container.appendChild(btn);
   }
 }
 
-// ── Connection Actions ────────────────────────────────────────
-async function handleRemoveConnection() {
-  try {
-    await deleteDoc(doc(db, 'users', profileUser.uid, 'connectionRequests', viewerUser.uid));
-    await deleteDoc(doc(db, 'users', viewerUser.uid,  'connectionRequests', profileUser.uid));
-    await updateDoc(doc(db, 'users', viewerUser.uid),  { connectionCount: increment(-1) });
-    await updateDoc(doc(db, 'users', profileUser.uid), { connectionCount: increment(-1) });
-    toast('Connection removed', 'info');
-    connectionStatus = null;
-    location.reload();
-  } catch(e) { toast('Error removing connection: ' + e.message, 'error'); }
-}
-
-async function handleAcceptConnection() {
-  try {
-    // Request lives in viewer's inbox — profileUser sent it, so from = profileUser.uid
-    await setDoc(
-      doc(db, 'users', viewerUser.uid, 'connectionRequests', profileUser.uid),
-      { status: 'accepted', from: profileUser.uid, updatedAt: serverTimestamp() },
-      { merge: true }
-    );
-    // Write mirror into profile's inbox so they also see connected status
-    await setDoc(
-      doc(db, 'users', profileUser.uid, 'connectionRequests', viewerUser.uid),
-      { status: 'accepted', from: profileUser.uid, updatedAt: serverTimestamp() },
-      { merge: true }
-    );
-    // Update the sender's sentRequests entry
-    await setDoc(
-      doc(db, 'users', profileUser.uid, 'sentRequests', viewerUser.uid),
-      { status: 'accepted', updatedAt: serverTimestamp() },
-      { merge: true }
-    );
-    await updateDoc(doc(db, 'users', viewerUser.uid),  { connectionCount: increment(1) });
-    await updateDoc(doc(db, 'users', profileUser.uid), { connectionCount: increment(1) });
-    toast('Connected!', 'success');
-    connectionStatus = 'connected';
-    location.reload();
-  } catch(e) { toast('Error accepting request: ' + e.message, 'error'); }
-}
-
-async function handleDeclineConnection() {
-  try {
-    // Request lives in viewer's inbox (profileUser sent it)
-    await deleteDoc(doc(db, 'users', viewerUser.uid,  'connectionRequests', profileUser.uid));
-    // Clean up sender's sentRequests
-    await deleteDoc(doc(db, 'users', profileUser.uid, 'sentRequests', viewerUser.uid));
-    toast('Request declined', 'info');
-    connectionStatus = null;
-    location.reload();
-  } catch(e) { toast('Error declining request: ' + e.message, 'error'); }
-}
-
-// ── Send Request (modal confirm) ──────────────────────────────
-document.getElementById('closeConnModal').addEventListener('click', () =>
-  document.getElementById('connReqModal').classList.remove('open'));
-document.getElementById('cancelConnBtn').addEventListener('click', () =>
-  document.getElementById('connReqModal').classList.remove('open'));
+document.getElementById('closeConnModal').addEventListener('click', () => document.getElementById('connReqModal').classList.remove('open'));
+document.getElementById('cancelConnBtn').addEventListener('click', () => document.getElementById('connReqModal').classList.remove('open'));
 
 document.getElementById('confirmConnBtn').addEventListener('click', async () => {
-  if (!viewerUser || !profileUser) return;
-  // Hard guard — block if any relationship already exists
-  if (connectionStatus !== null) {
-    toast('You already have a connection or pending request with this user', 'error');
-    document.getElementById('connReqModal').classList.remove('open');
-    return;
-  }
   try {
-    // Write into profile's inbox, keyed by viewerUid
-    await setDoc(
-      doc(db, 'users', profileUser.uid, 'connectionRequests', viewerUser.uid),
-      { status: 'pending', from: viewerUser.uid, createdAt: serverTimestamp() }
-    );
-    // Mirror into viewer's sentRequests so connections.html can list it
-    await setDoc(
-      doc(db, 'users', viewerUser.uid, 'sentRequests', profileUser.uid),
-      { status: 'pending', to: profileUser.uid, createdAt: serverTimestamp() }
-    );
-    toast('Connection request sent!', 'success');
+    // Write to profile's inbox (they need to accept)
+    await setDoc(doc(db,'users',profileUser.uid,'connectionRequests',viewerUser.uid), {
+      status: 'pending', from: viewerUser.uid, createdAt: serverTimestamp()
+    });
+    // FIX: also write to viewer's own sentRequests so the Sent tab shows it
+    await setDoc(doc(db,'users',viewerUser.uid,'sentRequests',profileUser.uid), {
+      status: 'pending', to: profileUser.uid, createdAt: serverTimestamp()
+    });
+    toast('Connection request sent!','success');
     document.getElementById('connReqModal').classList.remove('open');
     connectionStatus = 'pending_sent';
-    renderHero(); // refresh button state without full page reload
-  } catch(e) { toast('Error sending request: ' + e.message, 'error'); }
+    renderHero();
+  } catch(e) { toast('Error: ' + e.message, 'error'); }
 });
 
-// ── Load Products ─────────────────────────────────────────────
 async function loadProducts() {
-  try {
-    const snap = await getDocs(query(
-      collection(db, 'wishlists', profileUser.uid, 'products'),
-      orderBy('addedAt', 'desc')
-    ));
-    allProducts = [];
-    snap.forEach(d => allProducts.push({ id: d.id, ...d.data() }));
-  } catch(e) {
-    console.error('Error loading products:', e);
-    allProducts = [];
-  }
-
-  document.getElementById('profileContent').innerHTML = '';
-  renderAddress();
-
+  const snap = await getDocs(query(collection(db,'wishlists',profileUser.uid,'products'), orderBy('addedAt','desc')));
+  allProducts = [];
+  snap.forEach(d => allProducts.push({ id: d.id, ...d.data() }));
   if (!allProducts.length) {
-    const empty = document.createElement('div');
-    empty.className = 'empty-state';
-    empty.innerHTML = `
-      <div class="empty-icon">🎁</div>
-      <h3>Nothing here yet</h3>
-      <p>${profileUser.displayName} hasn't added any products yet.</p>`;
-    document.getElementById('profileContent').appendChild(empty);
-    return;
+    document.getElementById('profileContent').innerHTML = `<div class="empty-state"><div class="empty-icon">🎁</div><h3>Nothing here yet</h3><p>${profileUser.displayName} hasn't added any products to their wishlist yet.</p></div>`;
+  } else {
+    renderFilters();
+    renderProductList(allProducts);
   }
-
-  renderFilters();
-  renderProductList(allProducts);
+  renderAddress();
 }
 
-// ── Address ───────────────────────────────────────────────────
 function renderAddress() {
-  if (!profileUser.address) return;
   const av = profileUser.addressVisibility || 'connections';
   let showAddress = false;
-  if (isOwner) showAddress = true;
-  else if (av === 'all' && viewerUser) showAddress = true;
-  else if (av === 'connections' && connectionStatus === 'connected') showAddress = true;
-
+  if (!viewerUser) { showAddress = false; }
+  else if (isOwner) { showAddress = true; }
+  else if (av === 'all') { showAddress = true; }
+  else if (av === 'connections' && connectionStatus === 'connected') { showAddress = true; }
+  if (!profileUser.address) return;
   const wrap = document.createElement('div');
-  wrap.style.cssText =
-    'background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:28px;';
+  wrap.style.cssText = 'background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:28px;';
   wrap.innerHTML = `
     <div style="font-weight:700;font-size:16px;margin-bottom:12px;">📍 Delivery Address</div>
-    <div style="${showAddress ? '' : 'filter:blur(5px);user-select:none;pointer-events:none;'}">
-      ${showAddress
-        ? profileUser.address.replace(/\n/g, '<br>')
-        : '••• ••••• ••••••••• •••••••'}
-    </div>
-    ${!showAddress ? `<div style="font-size:12px;color:var(--text-muted);margin-top:8px;">
-      ${viewerUser
-        ? 'Connect to see the delivery address'
-        : 'Sign in and connect to see the delivery address'}
-    </div>` : ''}`;
-  document.getElementById('profileContent').appendChild(wrap);
+    <div class="address-box ${showAddress?'':'address-masked'}">${profileUser.address.replace(/\n/g,'<br>')}</div>
+    ${!showAddress ? `<div style="font-size:12px;color:var(--text-muted);margin-top:8px;">${viewerUser?'Connect to see the delivery address':'Sign in and connect to see the delivery address'}</div>`:''}
+  `;
+  document.getElementById('profileContent').prepend(wrap);
 }
 
-// ── Filters ───────────────────────────────────────────────────
 function renderFilters() {
   const cats = [...new Set(allProducts.map(p => p.category))];
   const wrap = document.createElement('div');
   wrap.className = 'filter-bar';
+  wrap.id = 'filterBar';
   wrap.innerHTML = `
     <div>
       <label>Category</label>
       <div class="filter-chips" id="catChips">
         <div class="chip active" data-cat="all">All</div>
-        ${cats.map(c => `<div class="chip" data-cat="${c}">${c}</div>`).join('')}
+        ${cats.map(c=>`<div class="chip" data-cat="${c}">${c}</div>`).join('')}
       </div>
     </div>
     <div class="price-range">
@@ -452,21 +328,21 @@ function renderFilters() {
         <option value="price_asc">Price: Low to High</option>
         <option value="price_desc">Price: High to Low</option>
       </select>
-    </div>`;
+    </div>
+  `;
   document.getElementById('profileContent').appendChild(wrap);
-
   document.querySelectorAll('.chip').forEach(chip => {
     chip.addEventListener('click', () => {
-      document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+      document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
       chip.classList.add('active');
       applyFilters();
     });
   });
   document.getElementById('applyFilter').addEventListener('click', applyFilters);
   document.getElementById('clearFilter').addEventListener('click', () => {
-    document.getElementById('minPrice').value = '';
-    document.getElementById('maxPrice').value = '';
-    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    document.getElementById('minPrice').value='';
+    document.getElementById('maxPrice').value='';
+    document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
     document.querySelector('.chip[data-cat="all"]').classList.add('active');
     applyFilters();
   });
@@ -483,43 +359,31 @@ function applyFilters() {
     if (p.price < minP || p.price > maxP) return false;
     return true;
   });
-  if (sort === 'price_asc') list.sort((a, b) => a.price - b.price);
-  else if (sort === 'price_desc') list.sort((a, b) => b.price - a.price);
+  if (sort === 'price_asc') list.sort((a,b) => a.price - b.price);
+  else if (sort === 'price_desc') list.sort((a,b) => b.price - a.price);
   renderProductList(list);
 }
 
-// ── Product List ──────────────────────────────────────────────
+const productWrapId = 'productListWrap';
 function renderProductList(list) {
-  let wrap = document.getElementById('productListWrap');
+  let wrap = document.getElementById(productWrapId);
   if (!wrap) {
-    wrap = document.createElement('div');
-    wrap.id = 'productListWrap';
+    wrap = document.createElement('div'); wrap.id = productWrapId;
     document.getElementById('profileContent').appendChild(wrap);
   }
   if (!list.length) {
-    wrap.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">🔍</div>
-      <h3>No products match your filters</h3></div>`;
+    wrap.innerHTML = `<div class="empty-state"><div class="empty-icon">🔍</div><h3>No products match your filters</h3></div>`;
     return;
   }
   const byCat = {};
-  list.forEach(p => {
-    if (!byCat[p.category]) byCat[p.category] = [];
-    byCat[p.category].push(p);
-  });
-  wrap.innerHTML = Object.entries(byCat).map(([cat, items]) => `
+  list.forEach(p => { if(!byCat[p.category]) byCat[p.category]=[]; byCat[p.category].push(p); });
+  wrap.innerHTML = Object.entries(byCat).map(([cat,items]) => `
     <div class="category-section">
-      <div class="category-title">${cat}
-        <span style="font-size:14px;font-weight:400;color:var(--text-muted)">(${items.length})</span>
-      </div>
+      <div class="category-title">${cat} <span style="font-size:14px;font-weight:400;color:var(--text-muted)">(${items.length})</span></div>
       <div class="product-grid">
         ${items.map(p => `
           <div class="product-card">
-            ${p.imageUrl
-              ? `<img src="${p.imageUrl}" class="product-img" alt="${p.name}"
-                      onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/>
-                 <div class="product-img-placeholder" style="display:none">🎁</div>`
-              : `<div class="product-img-placeholder">🎁</div>`}
+            ${p.imageUrl ? `<img src="${p.imageUrl}" class="product-img" alt="${p.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"/><div class="product-img-placeholder" style="display:none">🎁</div>` : `<div class="product-img-placeholder">🎁</div>`}
             <div class="product-body">
               <div class="product-category">${p.category}</div>
               <div class="product-name">${p.name}</div>
@@ -527,17 +391,17 @@ function renderProductList(list) {
               <div class="product-price">${formatPrice(p.price)}</div>
             </div>
             <div class="product-actions">
-              <a href="${p.affiliateUrl}" target="_blank" rel="noopener"
-                 class="btn btn-dark btn-sm" style="flex:1;justify-content:center;">Gift This 🎁</a>
+              <a href="${p.affiliateUrl}" target="_blank" rel="noopener" class="btn btn-dark btn-sm" style="flex:1;justify-content:center;">Gift This 🎁</a>
             </div>
-          </div>`).join('')}
+          </div>
+        `).join('')}
       </div>
-    </div>`).join('');
+    </div>
+  `).join('');
 }
 
-// Close modals on overlay click
 document.querySelectorAll('.modal-overlay').forEach(m => {
-  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+  m.addEventListener('click', e => { if (e.target===m) m.classList.remove('open'); });
 });
 </script>
 </body>

@@ -1,22 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Connections – Giftaan</title>
-  <link rel="stylesheet" href="css/styles.css"/>
-  <style>
-    .conn-wrap{max-width:720px;margin:40px auto;padding:0 20px;}
-    .tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;}
-    .tab-btn{padding:10px 24px;font-size:14px;font-weight:600;color:var(--text-muted);background:none;border:none;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:var(--transition);}
-    .tab-btn.active{color:var(--saffron);border-bottom-color:var(--saffron);}
-    .tab-panel{display:none;}
-    .tab-panel.active{display:block;}
-    .conn-avatar{width:48px;height:48px;border-radius:50%;background:var(--saffron);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;font-weight:700;flex-shrink:0;overflow:hidden;}
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Connections – Giftaan</title>
+<link rel="stylesheet" href="css/styles.css"/>
+<style>
+.conn-wrap{max-width:720px;margin:40px auto;padding:0 20px;}
+.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:24px;}
+.tab-btn{padding:10px 24px;font-size:14px;font-weight:600;color:var(--text-muted);background:none;border:none;cursor:pointer;border-bottom:3px solid transparent;margin-bottom:-2px;transition:var(--transition);}
+.tab-btn.active{color:var(--saffron);border-bottom-color:var(--saffron);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+.conn-avatar{width:48px;height:48px;border-radius:50%;background:var(--saffron);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;font-weight:700;flex-shrink:0;overflow:hidden;}
+</style>
 </head>
 <body>
-
 <nav class="navbar">
   <div class="navbar-inner">
     <a href="dashboard.html" class="navbar-brand">Gift<span>aan</span></a>
@@ -49,13 +48,11 @@
       <div style="text-align:center;padding:40px;color:var(--text-muted);">Loading…</div>
     </div>
   </div>
-
   <div class="tab-panel" id="tab-pending">
     <div class="connection-list" id="pendingList">
       <div style="text-align:center;padding:40px;color:var(--text-muted);">Loading…</div>
     </div>
   </div>
-
   <div class="tab-panel" id="tab-sent">
     <div class="connection-list" id="sentList">
       <div style="text-align:center;padding:40px;color:var(--text-muted);">Loading…</div>
@@ -66,266 +63,246 @@
 <div id="toast-container"></div>
 
 <script type="module">
-  import { auth, db } from './js/firebase-config.js';
-  import { toast, getUser, renderNav } from './js/utils.js';
-  import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-  import {
-    collection, getDocs, doc, setDoc, deleteDoc, updateDoc, increment, serverTimestamp
-  } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { auth, db } from './js/firebase-config.js';
+import { toast, getUser, renderNav } from './js/utils.js';
+import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+import {
+  collection, getDocs, doc, setDoc, deleteDoc, updateDoc, increment, serverTimestamp
+} from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-  let currentUser = null;
+let currentUser = null;
 
-  onAuthStateChanged(auth, async user => {
-    if (!user) { window.location.href = 'auth.html'; return; }
-    currentUser = user;
-    await renderNav(user);
-    await loadAll();
+onAuthStateChanged(auth, async user => {
+  if (!user) { window.location.href = 'auth.html'; return; }
+  currentUser = user;
+  await renderNav(user);
+  await loadAll();
+});
+
+// ── Tab switching ──────────────────────────────────────────────
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ── Load All Data ──────────────────────────────────────────────
+async function loadAll() {
+  const [connReqSnap, sentReqSnap] = await Promise.all([
+    getDocs(collection(db, 'users', currentUser.uid, 'connectionRequests')),
+    getDocs(collection(db, 'users', currentUser.uid, 'sentRequests'))
+  ]);
+
+  const connected = [];
+  const pendingReceived = [];
+
+  connReqSnap.forEach(d => {
+    const data = d.data();
+    if (data.status === 'accepted') {
+      connected.push({ uid: d.id, ...data });
+    } else if (data.status === 'pending') {
+      // This is in MY inbox — the other user sent it to me
+      pendingReceived.push({ uid: d.id, ...data });
+    }
   });
 
-  // ── Tab switching ─────────────────────────────────────────────
-  document.querySelectorAll('.tab-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-      btn.classList.add('active');
-      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  // Sent requests = docs in my sentRequests still pending
+  const sentPending = [];
+  sentReqSnap.forEach(d => {
+    const data = d.data();
+    if (data.status === 'pending') {
+      sentPending.push({ uid: d.id, ...data });
+    }
+  });
+
+  // Fetch all needed user docs
+  const allUids = new Set([
+    ...connected.map(c => c.uid),
+    ...pendingReceived.map(r => r.uid),
+    ...sentPending.map(s => s.uid)
+  ]);
+  const userCache = {};
+  await Promise.all([...allUids].map(async uid => {
+    userCache[uid] = await getUser(uid);
+  }));
+
+  renderConnected(connected, userCache);
+  renderPendingReceived(pendingReceived, userCache);
+  renderSentPending(sentPending, userCache);
+}
+
+// ── Avatar helper ──────────────────────────────────────────────
+function connAvatarHtml(u) {
+  return u?.avatarEmoji
+    ? `<span style="font-size:22px">${u.avatarEmoji}</span>`
+    : (u?.displayName || 'U')[0].toUpperCase();
+}
+
+// ── Render: Connected ──────────────────────────────────────────
+function renderConnected(list, userCache) {
+  const el = document.getElementById('connectedList');
+  document.getElementById('connCount').textContent = `(${list.length})`;
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">🤝</div>
+      <h3>No connections yet</h3>
+      <p>Visit someone's profile and send them a connection request!</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML = list.map(c => {
+    const u = userCache[c.uid];
+    if (!u) return '';
+    return `<div class="connection-card">
+      <div class="conn-avatar">${connAvatarHtml(u)}</div>
+      <div style="flex:1;">
+        <div style="font-weight:600;">${u.displayName || 'Unknown'}</div>
+        <div style="font-size:12px;color:var(--text-muted);">@${u.username || ''}</div>
+      </div>
+      <a href="profile.html?u=${u.username}" class="btn btn-ghost btn-sm">View Wishlist</a>
+      <button class="btn btn-danger btn-sm remove-btn" data-uid="${c.uid}">Remove</button>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const otherUid = btn.dataset.uid;
+      try {
+        // FIX: also clean up sentRequests on both sides
+        await deleteDoc(doc(db, 'users', currentUser.uid, 'connectionRequests', otherUid));
+        await deleteDoc(doc(db, 'users', otherUid, 'connectionRequests', currentUser.uid));
+        await deleteDoc(doc(db, 'users', currentUser.uid, 'sentRequests', otherUid));
+        await deleteDoc(doc(db, 'users', otherUid, 'sentRequests', currentUser.uid));
+        await updateDoc(doc(db, 'users', currentUser.uid), { connectionCount: increment(-1) });
+        await updateDoc(doc(db, 'users', otherUid), { connectionCount: increment(-1) });
+        toast('Connection removed', 'info');
+        await loadAll();
+      } catch(e) { toast('Error: ' + e.message, 'error'); }
+    });
+  });
+}
+
+// ── Render: Pending Received ───────────────────────────────────
+function renderPendingReceived(list, userCache) {
+  const el = document.getElementById('pendingList');
+  const badge = document.getElementById('pendingCount');
+  if (list.length) { badge.textContent = list.length; badge.style.display = 'inline-flex'; }
+  else { badge.style.display = 'none'; }
+
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📭</div>
+      <h3>No pending requests</h3>
+      <p>When someone sends you a connection request, it will appear here.</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML = list.map(r => {
+    const u = userCache[r.uid];
+    if (!u) return '';
+    return `<div class="connection-card">
+      <div class="conn-avatar">${connAvatarHtml(u)}</div>
+      <div style="flex:1;">
+        <div style="font-weight:600;">${u.displayName || 'Unknown'}</div>
+        <div style="font-size:12px;color:var(--text-muted);">@${u.username || ''}</div>
+      </div>
+      <button class="btn btn-primary btn-sm accept-btn" data-uid="${r.uid}">✓ Accept</button>
+      <button class="btn btn-ghost btn-sm decline-btn" data-uid="${r.uid}">✗ Decline</button>
+    </div>`;
+  }).join('');
+
+  el.querySelectorAll('.accept-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const otherUid = btn.dataset.uid;
+      try {
+        // Update my inbox entry to accepted
+        await setDoc(
+          doc(db, 'users', currentUser.uid, 'connectionRequests', otherUid),
+          { status: 'accepted', from: otherUid, updatedAt: serverTimestamp() },
+          { merge: true }
+        );
+        // Write mirror into the sender's inbox
+        await setDoc(
+          doc(db, 'users', otherUid, 'connectionRequests', currentUser.uid),
+          { status: 'accepted', from: otherUid, updatedAt: serverTimestamp() },
+          { merge: true }
+        );
+        // FIX: update sender's sentRequests so their Sent tab reflects accepted
+        await setDoc(
+          doc(db, 'users', otherUid, 'sentRequests', currentUser.uid),
+          { status: 'accepted', updatedAt: serverTimestamp() },
+          { merge: true }
+        );
+        await updateDoc(doc(db, 'users', currentUser.uid), { connectionCount: increment(1) });
+        await updateDoc(doc(db, 'users', otherUid), { connectionCount: increment(1) });
+        toast('Connected!', 'success');
+        await loadAll();
+      } catch(e) { toast('Error: ' + e.message, 'error'); }
     });
   });
 
-  // ── Load All Data ─────────────────────────────────────────────
-  async function loadAll() {
-    // connectionRequests sub-collection: holds both received-pending and accepted (both directions)
-    // sentRequests sub-collection: holds requests this user sent (pending or accepted)
-    const [connReqSnap, sentReqSnap] = await Promise.all([
-      getDocs(collection(db, 'users', currentUser.uid, 'connectionRequests')),
-      getDocs(collection(db, 'users', currentUser.uid, 'sentRequests'))
-    ]);
-
-    // Connected = any accepted doc in connectionRequests (either direction gets a mirror written)
-    const connected = [];
-    // Pending received = pending docs in connectionRequests (the other user sent, so from !== me)
-    const pendingReceived = [];
-
-    connReqSnap.forEach(d => {
-      const data = d.data();
-      if (data.status === 'accepted') {
-        connected.push({ uid: d.id, ...data });
-      } else if (data.status === 'pending') {
-        // This doc is in MY connectionRequests inbox, so the other user sent it to me
-        pendingReceived.push({ uid: d.id, ...data });
-      }
+  el.querySelectorAll('.decline-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const otherUid = btn.dataset.uid;
+      try {
+        // Remove from my inbox
+        await deleteDoc(doc(db, 'users', currentUser.uid, 'connectionRequests', otherUid));
+        // FIX: also clean up the sender's sentRequests
+        await deleteDoc(doc(db, 'users', otherUid, 'sentRequests', currentUser.uid));
+        toast('Request declined', 'info');
+        await loadAll();
+      } catch(e) { toast('Error: ' + e.message, 'error'); }
     });
+  });
+}
 
-    // Sent requests = docs in my sentRequests that are still pending
-    const sentPending = [];
-    sentReqSnap.forEach(d => {
-      const data = d.data();
-      if (data.status === 'pending') {
-        sentPending.push({ uid: d.id, ...data });
-      }
-    });
+// ── Render: Sent Pending ───────────────────────────────────────
+function renderSentPending(list, userCache) {
+  const el = document.getElementById('sentList');
+  const badge = document.getElementById('sentCount');
+  if (list.length) { badge.textContent = list.length; badge.style.display = 'inline-flex'; }
+  else { badge.style.display = 'none'; }
 
-    // Gather all UIDs we need to fetch user docs for
-    const allUids = new Set([
-      ...connected.map(c => c.uid),
-      ...pendingReceived.map(r => r.uid),
-      ...sentPending.map(s => s.uid)
-    ]);
-
-    // Fetch user docs in parallel
-    const userCache = {};
-    await Promise.all([...allUids].map(async uid => {
-      userCache[uid] = await getUser(uid);
-    }));
-
-    renderConnected(connected, userCache);
-    renderPendingReceived(pendingReceived, userCache);
-    renderSentPending(sentPending, userCache);
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📤</div>
+      <h3>No sent requests</h3>
+      <p>Connection requests you send will appear here until accepted or declined.</p>
+    </div>`;
+    return;
   }
+  el.innerHTML = list.map(s => {
+    const u = userCache[s.uid];
+    if (!u) return '';
+    return `<div class="connection-card">
+      <div class="conn-avatar">${connAvatarHtml(u)}</div>
+      <div style="flex:1;">
+        <div style="font-weight:600;">${u.displayName || 'Unknown'}</div>
+        <div style="font-size:12px;color:var(--text-muted);">@${u.username || ''} · Awaiting response</div>
+      </div>
+      <button class="btn btn-ghost btn-sm cancel-btn"
+        data-uid="${s.uid}"
+        style="color:var(--crimson);border-color:var(--crimson);">Cancel</button>
+    </div>`;
+  }).join('');
 
-  // ── Avatar helper ─────────────────────────────────────────────
-  function connAvatarHtml(u) {
-    return u?.avatarEmoji
-      ? `<span style="font-size:22px">${u.avatarEmoji}</span>`
-      : (u?.displayName || 'U')[0].toUpperCase();
-  }
-
-  // ── Render: Connected ─────────────────────────────────────────
-  function renderConnected(list, userCache) {
-    const el = document.getElementById('connectedList');
-    document.getElementById('connCount').textContent = `(${list.length})`;
-
-    if (!list.length) {
-      el.innerHTML = `<div class="empty-state">
-        <div class="empty-icon">🤝</div>
-        <h3>No connections yet</h3>
-        <p>Visit someone's profile and send them a connection request!</p>
-      </div>`;
-      return;
-    }
-
-    el.innerHTML = list.map(c => {
-      const u = userCache[c.uid];
-      if (!u) return '';
-      return `<div class="connection-card">
-        <div class="conn-avatar">${connAvatarHtml(u)}</div>
-        <div style="flex:1;">
-          <div style="font-weight:600;">${u.displayName || 'Unknown'}</div>
-          <div style="font-size:12px;color:var(--text-muted);">@${u.username || ''}</div>
-        </div>
-        <a href="profile.html?u=${u.username}" class="btn btn-ghost btn-sm">View Wishlist</a>
-        <button class="btn btn-danger btn-sm remove-btn" data-uid="${u.uid}">Remove</button>
-      </div>`;
-    }).join('');
-
-    el.querySelectorAll('.remove-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const otherUid = btn.dataset.uid;
-        try {
-          // Delete both sides of the accepted connection
-          await deleteDoc(doc(db, 'users', currentUser.uid, 'connectionRequests', otherUid));
-          await deleteDoc(doc(db, 'users', otherUid, 'connectionRequests', currentUser.uid));
-          // Decrement both counts
-          await updateDoc(doc(db, 'users', currentUser.uid), { connectionCount: increment(-1) });
-          await updateDoc(doc(db, 'users', otherUid),        { connectionCount: increment(-1) });
-          toast('Connection removed', 'info');
-          await loadAll();
-        } catch(e) { toast('Error: ' + e.message, 'error'); }
-      });
+  el.querySelectorAll('.cancel-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const otherUid = btn.dataset.uid;
+      try {
+        // Remove from recipient's inbox
+        await deleteDoc(doc(db, 'users', otherUid, 'connectionRequests', currentUser.uid));
+        // Remove from my sentRequests
+        await deleteDoc(doc(db, 'users', currentUser.uid, 'sentRequests', otherUid));
+        toast('Request cancelled', 'info');
+        await loadAll();
+      } catch(e) { toast('Error: ' + e.message, 'error'); }
     });
-  }
-
-  // ── Render: Pending Received ──────────────────────────────────
-  function renderPendingReceived(list, userCache) {
-    const el = document.getElementById('pendingList');
-    const badge = document.getElementById('pendingCount');
-
-    if (list.length) {
-      badge.textContent = list.length;
-      badge.style.display = 'inline-flex';
-    } else {
-      badge.style.display = 'none';
-    }
-
-    if (!list.length) {
-      el.innerHTML = `<div class="empty-state">
-        <div class="empty-icon">📭</div>
-        <h3>No pending requests</h3>
-        <p>When someone sends you a connection request, it will appear here.</p>
-      </div>`;
-      return;
-    }
-
-    el.innerHTML = list.map(r => {
-      const u = userCache[r.uid];
-      if (!u) return '';
-      return `<div class="connection-card">
-        <div class="conn-avatar">${connAvatarHtml(u)}</div>
-        <div style="flex:1;">
-          <div style="font-weight:600;">${u.displayName || 'Unknown'}</div>
-          <div style="font-size:12px;color:var(--text-muted);">@${u.username || ''}</div>
-        </div>
-        <button class="btn btn-primary btn-sm accept-btn" data-uid="${u.uid}">✓ Accept</button>
-        <button class="btn btn-ghost btn-sm decline-btn" data-uid="${u.uid}">✗ Decline</button>
-      </div>`;
-    }).join('');
-
-    el.querySelectorAll('.accept-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const otherUid = btn.dataset.uid;
-        try {
-          // The pending doc lives in MY inbox — the other user (otherUid) sent it
-          // Update it to accepted, preserving from: otherUid
-          await setDoc(
-            doc(db, 'users', currentUser.uid, 'connectionRequests', otherUid),
-            { status: 'accepted', from: otherUid, updatedAt: serverTimestamp() },
-            { merge: true }
-          );
-          // Write mirror into the sender's inbox so they also see connected
-          await setDoc(
-            doc(db, 'users', otherUid, 'connectionRequests', currentUser.uid),
-            { status: 'accepted', from: otherUid, updatedAt: serverTimestamp() },
-            { merge: true }
-          );
-          // Update sender's sentRequests so their Sent tab shows accepted
-          await setDoc(
-            doc(db, 'users', otherUid, 'sentRequests', currentUser.uid),
-            { status: 'accepted', updatedAt: serverTimestamp() },
-            { merge: true }
-          );
-          await updateDoc(doc(db, 'users', currentUser.uid), { connectionCount: increment(1) });
-          await updateDoc(doc(db, 'users', otherUid),        { connectionCount: increment(1) });
-          toast('Connected!', 'success');
-          await loadAll();
-        } catch(e) { toast('Error: ' + e.message, 'error'); }
-      });
-    });
-
-    el.querySelectorAll('.decline-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const otherUid = btn.dataset.uid;
-        try {
-          // Delete the pending doc from MY inbox
-          await deleteDoc(doc(db, 'users', currentUser.uid, 'connectionRequests', otherUid));
-          // Also clean up the sender's sentRequests entry
-          await deleteDoc(doc(db, 'users', otherUid, 'sentRequests', currentUser.uid));
-          toast('Request declined', 'info');
-          await loadAll();
-        } catch(e) { toast('Error: ' + e.message, 'error'); }
-      });
-    });
-  }
-
-  // ── Render: Sent Pending ──────────────────────────────────────
-  function renderSentPending(list, userCache) {
-    const el = document.getElementById('sentList');
-    const badge = document.getElementById('sentCount');
-
-    if (list.length) {
-      badge.textContent = list.length;
-      badge.style.display = 'inline-flex';
-    } else {
-      badge.style.display = 'none';
-    }
-
-    if (!list.length) {
-      el.innerHTML = `<div class="empty-state">
-        <div class="empty-icon">📤</div>
-        <h3>No sent requests</h3>
-        <p>Connection requests you send will appear here until accepted or declined.</p>
-      </div>`;
-      return;
-    }
-
-    el.innerHTML = list.map(s => {
-      const u = userCache[s.uid];
-      if (!u) return '';
-      return `<div class="connection-card">
-        <div class="conn-avatar">${connAvatarHtml(u)}</div>
-        <div style="flex:1;">
-          <div style="font-weight:600;">${u.displayName || 'Unknown'}</div>
-          <div style="font-size:12px;color:var(--text-muted);">@${u.username || ''} · Awaiting response</div>
-        </div>
-        <button class="btn btn-ghost btn-sm cancel-btn"
-                data-uid="${u.uid}"
-                style="color:var(--crimson);border-color:var(--crimson);">Cancel</button>
-      </div>`;
-    }).join('');
-
-    el.querySelectorAll('.cancel-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const otherUid = btn.dataset.uid;
-        try {
-          // Remove the request from the recipient's inbox
-          await deleteDoc(doc(db, 'users', otherUid, 'connectionRequests', currentUser.uid));
-          // Remove from my own sentRequests
-          await deleteDoc(doc(db, 'users', currentUser.uid, 'sentRequests', otherUid));
-          toast('Request cancelled', 'info');
-          await loadAll();
-        } catch(e) { toast('Error: ' + e.message, 'error'); }
-      });
-    });
-  }
+  });
+}
 </script>
 </body>
 </html>
