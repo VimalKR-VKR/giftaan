@@ -177,7 +177,12 @@ function loadSidebar() {
   const link = `${location.origin}${location.pathname.replace('dashboard.html','')}profile.html?u=${userDoc?.username}`;
   document.getElementById('profileLinkInput').value = link;
   document.getElementById('sidebarViewProfile').href = `profile.html?u=${userDoc?.username}`;
-  document.getElementById('statConnections').textContent = userDoc?.connectionCount || 0;
+  // Count actual connected rows instead of trusting stored number
+  const connSnap = await getDocs(query(
+    collection(db, 'users', currentUser.uid, 'connectionRequests'),
+    where('status', '==', 'accepted')
+  ));
+document.getElementById('statConnections').textContent = connSnap.size;
   import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js').then(async ({ getDocs: gd, collection: col, query: q, where }) => {
     const snap = await gd(q(col(db,'users',currentUser.uid,'connectionRequests'), where('status','==','pending')));
     if (!snap.empty) {
