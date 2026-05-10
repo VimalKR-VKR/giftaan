@@ -177,17 +177,13 @@ async function loadSidebar() {
   const link = `${location.origin}${location.pathname.replace('dashboard.html','')}profile.html?u=${userDoc?.username}`;
   document.getElementById('profileLinkInput').value = link;
   document.getElementById('sidebarViewProfile').href = `profile.html?u=${userDoc?.username}`;
-  // Count actual connected rows instead of trusting stored number
-  const connSnap = await getDocs(query(
-  collection(db, 'users', currentUser.uid, 'connectionRequests'),
-  where('status', '==', 'accepted')
-));
-document.getElementById('statConnections').textContent = connSnap.size;
-  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js').then(async ({ getDocs: gd, collection: col, query: q, where }) => {
-    const snap = await gd(q(col(db,'users',currentUser.uid,'connectionRequests'), where('status','==','pending')));
-    if (!snap.empty) {
+  import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js').then(async ({ getDocs: gd, collection: col, query: q, where: w }) => {
+    const connSnap = await gd(q(col(db,'users',currentUser.uid,'connectionRequests'), w('status','==','accepted')));
+    document.getElementById('statConnections').textContent = connSnap.size;
+    const pendingSnap = await gd(q(col(db,'users',currentUser.uid,'connectionRequests'), w('status','==','pending')));
+    if (!pendingSnap.empty) {
       const b = document.getElementById('pendingBadge');
-      b.textContent = snap.size; b.classList.remove('hidden');
+      b.textContent = pendingSnap.size; b.classList.remove('hidden');
     }
   });
 }
