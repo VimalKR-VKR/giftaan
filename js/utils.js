@@ -55,7 +55,7 @@ export async function renderNav(currentUser) {
     <a href="profile.html?u=${u?.username||''}" class="btn btn-ghost btn-sm">My Profile</a>
     <div class="dropdown">
       <div class="nav-avatar" id="navAvatarBtn" style="cursor:pointer;position:relative;">
-        ${u?.avatarEmoji ? `<span style="font-size:20px">${u.avatarEmoji}</span>` : (u?.displayName||'U')[0].toUpperCase()}
+        ${u?.avatarEmoji ? `<span style="font-size:20px">${u.avatarEmoji}</span>` : u?.photoURL ? `<img src="${u.photoURL}" style="width:32px;height:32px;border-radius:50%;object-fit:cover;" referrerpolicy="no-referrer"/>` : (u?.displayName||'U')[0].toUpperCase()}
         ${hasPending ? '<span class="nav-dot"></span>' : ''}
       </div>
       <div class="dropdown-menu" id="navDropdown">
