@@ -27,7 +27,7 @@
 <!-- Navbar -->
 <nav class="navbar">
   <div class="navbar-inner">
-    <a href="index.html" class="navbar-brand">Gift<span>aan</span></a>
+    <a href="#" class="navbar-brand" id="logoLink">Gift<span>aan</span></a>
     <div class="navbar-search">
       <span class="search-icon">🔍</span>
       <input type="text" id="heroSearch" placeholder="Search wishlists by name…" autocomplete="off" />
@@ -139,24 +139,19 @@
   import { collection, query, where, getDocs, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
   onAuthStateChanged(auth, (user) => {
+    // Logo smart redirect
+    document.getElementById('logoLink').addEventListener('click', e => {
+      e.preventDefault();
+      window.location.href = user ? 'dashboard.html' : 'auth.html';
+    });
+
     if (user) {
-      document.getElementById('navActions').innerHTML = `
-        <a href="dashboard.html" class="btn btn-ghost btn-sm">Dashboard</a>
-        <a href="dashboard.html" class="nav-avatar" id="navAvatar" style="text-decoration:none;"></a>
-      `;
-      // Load avatar
-      import('./js/utils.js').then(({ getUser }) => {
-        getUser(user.uid).then(u => {
-          if (u) {
-            const av = document.getElementById('navAvatar');
-            if (u.avatarEmoji) av.innerHTML = `<span style="font-size:20px">${u.avatarEmoji}</span>`;
-            else av.textContent = (u.displayName||'U')[0].toUpperCase();
-          }
-        });
-      });
+      // Redirect logged-in users away from landing page
+      window.location.href = 'dashboard.html';
     }
   });
 
+  
   // Search
   const searchInput = document.getElementById('heroSearch');
   const searchResults = document.getElementById('heroSearchResults');
