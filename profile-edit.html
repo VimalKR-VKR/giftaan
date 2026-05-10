@@ -131,6 +131,26 @@
   let userDoc = null;
   let selectedAvatar = '';
 
+// Build avatar grid immediately on page load (no need to wait for auth)
+(function buildAvatarGridNow() {
+  const grid = document.getElementById('avatarGrid');
+  if (!grid) return;
+  import('./js/utils.js').then(({ AVATARS }) => {
+    selectedAvatar = AVATARS[0];
+    AVATARS.forEach(emoji => {
+      const el = document.createElement('div');
+      el.className = 'avatar-option' + (emoji === selectedAvatar ? ' selected' : '');
+      el.textContent = emoji;
+      el.addEventListener('click', () => {
+        selectedAvatar = emoji;
+        document.querySelectorAll('.avatar-option').forEach(a => a.classList.remove('selected'));
+        el.classList.add('selected');
+      });
+      grid.appendChild(el);
+    });
+  });
+})();
+
   onAuthStateChanged(auth, async user => {
     if (!user) { window.location.href = 'auth.html'; return; }
     currentUser = user;
