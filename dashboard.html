@@ -350,6 +350,28 @@ document.getElementById('saveProductBtn').addEventListener('click', async () => 
   if (!price && price !== 0) return toast('Price is required','error');
   if (!category) category = 'Other';
 
+  // Validate Amazon URL if provided
+  if (url) {
+    try {
+      const parsedUrl = new URL(url);
+      const validAmazonDomains = [
+        'amazon.in', 'www.amazon.in',
+        'amazon.com', 'www.amazon.com',
+        'amazon.co.uk', 'www.amazon.co.uk',
+        'amazon.de', 'www.amazon.de',
+        'amazon.fr', 'www.amazon.fr',
+        'amazon.co.jp', 'www.amazon.co.jp',
+        'amazon.ca', 'www.amazon.ca',
+        'amazon.com.au', 'www.amazon.com.au',
+        'amzn.in', 'amzn.to', 'amzn.eu'
+      ];
+      if (!validAmazonDomains.includes(parsedUrl.hostname)) {
+        return toast('Please enter a valid Amazon product link','error');
+      }
+    } catch {
+      return toast('Please enter a valid URL','error');
+    }
+  }
   const affiliateUrl = url ? buildAffiliateUrl(url) : '#';
 
   try {
