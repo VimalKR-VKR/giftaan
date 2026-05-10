@@ -45,8 +45,9 @@
   <div class="edit-section">
     <div class="edit-section-title">Profile Avatar</div>
     <div class="avatar-grid" id="avatarGrid"></div>
+    <button class="btn btn-primary" style="margin-top:16px;" id="saveAvatarBtn">Save Avatar</button>
   </div>
-
+  
   <!-- Basic Info -->
   <div class="edit-section">
     <div class="edit-section-title">Basic Information</div>
@@ -157,6 +158,58 @@
     userDoc = await getUser(user.uid);
     await renderNav(user);
     populateForm();
+
+    // Save Avatar
+    document.getElementById('saveAvatarBtn').addEventListener('click', async () => {
+      try {
+        await updateDoc(doc(db,'users',currentUser.uid), { avatarEmoji: selectedAvatar });
+        userDoc = { ...userDoc, avatarEmoji: selectedAvatar };
+        toast('Avatar saved!','success');
+      } catch(e) { toast('Error: ' + e.message,'error'); }
+    });
+
+    // Save Basic
+    document.getElementById('saveBasicBtn').addEventListener('click', async () => {
+      const name = document.getElementById('editName').value.trim();
+      const username = document.getElementById('editUsername').value.trim().toLowerCase();
+      const about = document.getElementById('editAbout').value.trim();
+      if (!name) return toast('Name is required','error');
+      if (wordCount(about) > 100) return toast('About section exceeds 100 words','error');
+      if (username !== userDoc.username) {
+        const q = query(collection(db,'users'), where('username','==',username), limit(1));
+        const snap = await getDocs(q);
+        if (!snap.empty) return toast('Username already taken','error');
+      }
+      try {
+        await updateDoc(doc(db,'users',currentUser.uid), {
+          displayName: name, displayNameLower: name.toLowerCase(),
+          username, about, avatarEmoji: selectedAvatar
+        });
+        userDoc = { ...userDoc, displayName: name, username, about, avatarEmoji: selectedAvatar };
+        toast('Profile updated!','success');
+      } catch(e) { toast('Error: ' + e.message,'error'); }
+    });
+
+    // Save Address
+    document.getElementById('saveAddressBtn').addEventListener('click', async () => {
+      const address = document.getElementById('editAddress').value.trim();
+      try {
+        await updateDoc(doc(db,'users',currentUser.uid), { address });
+        toast('Address saved!','success');
+      } catch(e) { toast('Error: ' + e.message,'error'); }
+    });
+
+    // Save Privacy
+    document.getElementById('savePrivacyBtn').addEventListener('click', async () => {
+      const isPrivate = document.getElementById('togglePrivate').checked;
+      let addressVisibility = 'connections';
+      if (document.getElementById('addrAll').checked) addressVisibility = 'all';
+      else if (document.getElementById('addrHidden').checked) addressVisibility = 'hidden';
+      try {
+        await updateDoc(doc(db,'users',currentUser.uid), { isPrivate, addressVisibility });
+        toast('Privacy settings saved!','success');
+      } catch(e) { toast('Error: ' + e.message,'error'); }
+    });
   });
 
   function populateForm() {
@@ -223,43 +276,7 @@
     }, 400);
   });
 
-  // Save Basic
-  document.getElementById('saveBasicBtn').addEventListener('click', async () => {
-    const name = document.getElementById('editName').value.trim();
-    const username = document.getElementById('editUsername').value.trim().toLowerCase();
-    const about = document.getElementById('editAbout').value.trim();
-    if (!name) return toast('Name is required','error');
-    if (wordCount(about) > 100) return toast('About section exceeds 100 words','error');
-    // Check username uniqueness if changed
-    if (username !== userDoc.username) {
-      const q = query(collection(db,'users'), where('username','==',username), limit(1));
-      const snap = await getDocs(q);
-      if (!snap.empty) return toast('Username already taken','error');
-    }
-    await updateDoc(doc(db,'users',currentUser.uid), {
-      displayName: name, displayNameLower: name.toLowerCase(),
-      username, about, avatarEmoji: selectedAvatar
-    });
-    userDoc = { ...userDoc, displayName: name, username, about, avatarEmoji: selectedAvatar };
-    toast('Profile updated!','success');
-  });
-
-  // Save Address
-  document.getElementById('saveAddressBtn').addEventListener('click', async () => {
-    const address = document.getElementById('editAddress').value.trim();
-    await updateDoc(doc(db,'users',currentUser.uid), { address });
-    toast('Address saved!','success');
-  });
-
-  // Save Privacy
-  document.getElementById('savePrivacyBtn').addEventListener('click', async () => {
-    const isPrivate = document.getElementById('togglePrivate').checked;
-    let addressVisibility = 'connections';
-    if (document.getElementById('addrAll').checked) addressVisibility = 'all';
-    else if (document.getElementById('addrHidden').checked) addressVisibility = 'hidden';
-    await updateDoc(doc(db,'users',currentUser.uid), { isPrivate, addressVisibility });
-    toast('Privacy settings saved!','success');
-  });
+  
 </script>
 </body>
 </html>
