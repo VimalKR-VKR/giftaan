@@ -67,11 +67,16 @@ onAuthStateChanged(auth, async viewer => {
 });
 
 async function loadProfile() {
-  profileUser = await getUserByUsername(username);
-  if (!profileUser) {
-    document.getElementById('profileContent').innerHTML = `<div class="empty-state"><div class="empty-icon">😕</div><h3>Profile not found</h3><p>This user doesn't exist or has changed their username.</p></div>`;
-    return;
-  }
+    try {
+      profileUser = await getUserByUsername(username);
+    } catch(e) {
+      document.getElementById('profileContent').innerHTML = `<div class="empty-state"><div class="empty-icon">😕</div><h3>Could not load profile</h3><p>There was an error loading this profile. Please try again.</p></div>`;
+      return;
+    }
+    if (!profileUser) {
+      document.getElementById('profileContent').innerHTML = `<div class="empty-state"><div class="empty-icon">😕</div><h3>Profile not found</h3><p>This user doesn't exist or has changed their username.</p></div>`;
+      return;
+    }
   document.title = `${profileUser.displayName}'s Wishlist – Giftaan`;
   isOwner = viewerUser && viewerUser.uid === profileUser.uid;
   if (viewerUser && !isOwner) {
@@ -269,7 +274,13 @@ document.getElementById('confirmConnBtn').addEventListener('click', async () => 
 });
 
 async function loadProducts() {
-  const snap = await getDocs(query(collection(db,'wishlists',profileUser.uid,'products'), orderBy('addedAt','desc')));
+  let snap;
+    try {
+      snap = await getDocs(query(collection(db,'wishlists',profileUser.uid,'products'), orderBy('addedAt','desc')));
+    } catch(e) {
+      // Index may be missing — fall back to unordered fetch
+      snap = await getDocs(collection(db,'wishlists',profileUser.uid,'products'));
+    }
   allProducts = [];
   snap.forEach(d => allProducts.push({ id: d.id, ...d.data() }));
   if (!allProducts.length) {
