@@ -12,13 +12,14 @@ service cloud.firestore {
 
     // ── Connection Requests ────────────────────────────────
     match /users/{uid}/connectionRequests/{fromUid} {
-      // Owner can read all their requests
-      allow read: if request.auth != null && request.auth.uid == uid;
-      // Anyone signed in can write to request connection (send request)
-      allow create: if request.auth != null && request.auth.uid == fromUid;
-      // Owner can update (accept/decline) or the sender can cancel
-      allow update, delete: if request.auth != null &&
-        (request.auth.uid == uid || request.auth.uid == fromUid);
+  // Owner OR the sender can read (needed to check connection status)
+  allow read: if request.auth != null &&
+    (request.auth.uid == uid || request.auth.uid == fromUid);
+  // Anyone signed in can write to request connection (send request)
+  allow create: if request.auth != null && request.auth.uid == fromUid;
+  // Owner can update (accept/decline) or the sender can cancel
+  allow update, delete: if request.auth != null &&
+    (request.auth.uid == uid || request.auth.uid == fromUid);
     }
 
     // ── Wishlists ──────────────────────────────────────────
