@@ -148,7 +148,7 @@ import { toast, getUser, renderNav, initSearch, PRESET_CATEGORIES, formatPrice }
 import { onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 import {
   collection, addDoc, getDocs, deleteDoc, doc, query,
-  orderBy, serverTimestamp, updateDoc, setDoc
+  orderBy, serverTimestamp, updateDoc, setDoc, where
 } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
 let currentUser = null;
@@ -168,7 +168,7 @@ onAuthStateChanged(auth, async user => {
 });
 
 // ── Sidebar ──────────────────────────────────────────────────
-function loadSidebar() {
+async function loadSidebar() {
   const av = document.getElementById('sidebarAvatar');
   if (userDoc?.avatarEmoji) av.innerHTML = `<span style="font-size:32px">${userDoc.avatarEmoji}</span>`;
   else av.textContent = (userDoc?.displayName||'U')[0].toUpperCase();
@@ -179,9 +179,9 @@ function loadSidebar() {
   document.getElementById('sidebarViewProfile').href = `profile.html?u=${userDoc?.username}`;
   // Count actual connected rows instead of trusting stored number
   const connSnap = await getDocs(query(
-    collection(db, 'users', currentUser.uid, 'connectionRequests'),
-    where('status', '==', 'accepted')
-  ));
+  collection(db, 'users', currentUser.uid, 'connectionRequests'),
+  where('status', '==', 'accepted')
+));
 document.getElementById('statConnections').textContent = connSnap.size;
   import('https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js').then(async ({ getDocs: gd, collection: col, query: q, where }) => {
     const snap = await gd(q(col(db,'users',currentUser.uid,'connectionRequests'), where('status','==','pending')));
