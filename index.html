@@ -139,14 +139,12 @@
   import { collection, query, where, getDocs, orderBy, limit } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
   onAuthStateChanged(auth, (user) => {
-    // Logo smart redirect
     document.getElementById('logoLink').addEventListener('click', e => {
       e.preventDefault();
-      window.location.href = user ? 'dashboard.html' : 'auth.html';
+      window.location.href = user ? 'dashboard.html' : 'index.html';
     });
 
     if (user) {
-      // Redirect logged-in users away from landing page
       window.location.href = 'dashboard.html';
     }
   });
